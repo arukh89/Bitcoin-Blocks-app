@@ -4,8 +4,8 @@
   "framework": "nextjs",
   "regions": ["iad1"],
   "env": {
-    "NEXT_PUBLIC_SPACETIME_HOST": "wss://mainnet.spacetimedb.com",
-    "NEXT_PUBLIC_SPACETIME_DB_NAME": "bitcoin-blocks"
+    "NEXT_PUBLIC_SPACETIME_HOST": "wss://maincloud.spacetimedb.com",
+    "NEXT_PUBLIC_SPACETIME_DB_NAME": "bitcoin-blocks-app"
   },
   "headers": [
     {

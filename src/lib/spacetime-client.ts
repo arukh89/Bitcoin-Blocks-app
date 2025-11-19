@@ -5,8 +5,8 @@ import { DbConnection, type RemoteTables, type RemoteReducers } from '@/spacetim
 // IMPORTANT: Module must be published to SpacetimeDB Maincloud using CLI
 // Using Maincloud (production-ready database)
 // Instructions: See DEPLOYMENT_GUIDE.md
-const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || 'wss://mainnet.spacetimedb.com'
-const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || 'bitcoin-blocks'
+const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || 'wss://maincloud.spacetimedb.com'
+const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || 'bitcoin-blocks-app'
 
 let dbConnection: DbConnection | null = null
 let isConnecting = false
@@ -93,7 +93,7 @@ export async function connectToSpacetime(): Promise<DbConnection> {
     console.error('❌ Failed to connect to SpacetimeDB:', error)
     
     // Provide helpful error messages
-    const isMaincloud = SPACETIME_HOST.includes('mainnet')
+    const isMaincloud = SPACETIME_HOST.includes('maincloud')
     const isTestnet = SPACETIME_HOST.includes('testnet')
     
     if (errorMsg.includes('timeout')) {
@@ -111,7 +111,7 @@ export async function connectToSpacetime(): Promise<DbConnection> {
     console.error('1. Install SpacetimeDB CLI: curl --proto \'=https\' --tlsv1.2 -sSf https://install.spacetimedb.com | sh')
     
     if (isMaincloud) {
-      console.error('2. Publish to maincloud: cd spacetime-server && spacetime publish --host mainnet.spacetimedb.com', SPACETIME_DB_NAME)
+      console.error('2. Publish to maincloud: cd spacetime-server && spacetime publish', SPACETIME_DB_NAME, '--server maincloud')
     } else if (isTestnet) {
       console.error('2. Publish to testnet: cd spacetime-server && spacetime publish --host testnet.spacetimedb.com', SPACETIME_DB_NAME)
     } else {
