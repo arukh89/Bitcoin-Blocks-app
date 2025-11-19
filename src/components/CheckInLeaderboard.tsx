@@ -7,9 +7,9 @@ import { Badge } from '@/components/ui/badge'
 import { Trophy, Flame, Star } from 'lucide-react'
 
 export function CheckInLeaderboard() {
-  const { checkInLeaderboard } = useGame()
+  const { weeklyCheckInLeaderboard } = useGame()
 
-  if (!checkInLeaderboard || checkInLeaderboard.length === 0) {
+  if (!weeklyCheckInLeaderboard || weeklyCheckInLeaderboard.length === 0) {
     return null
   }
 
@@ -23,13 +23,13 @@ export function CheckInLeaderboard() {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {checkInLeaderboard.map((entry, index) => {
+          {weeklyCheckInLeaderboard.map((entry, index) => {
             const rank = index + 1
             const isTopThree = rank <= 3
 
             return (
               <div
-                key={`${entry.userId}-${entry.currentStreak}`}
+                key={`${entry.userIdentifier}-${entry.currentStreak}-${index}`}
                 className={`flex items-center gap-3 p-3 rounded-lg ${
                   isTopThree ? 'bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-500/30' : 'bg-gray-800'
                 }`}
@@ -54,7 +54,7 @@ export function CheckInLeaderboard() {
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-white truncate">{entry.username}</div>
                   <div className="text-xs text-gray-400">
-                    {entry.totalCheckIns} check-ins this week
+                    {entry.weeklyCheckins} check-ins this week
                   </div>
                 </div>
 
@@ -77,7 +77,7 @@ export function CheckInLeaderboard() {
           })}
         </div>
 
-        {checkInLeaderboard.length === 0 && (
+        {weeklyCheckInLeaderboard.length === 0 && (
           <div className="text-center py-8 text-gray-400">
             <Trophy className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>No check-ins yet this week.</p>
