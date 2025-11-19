@@ -14,7 +14,7 @@ import type {
   LogEvent as STDBLog,
   ChatMessage as STDBChatMsg,
   PrizeConfig as STDBPrizeConfig 
-} from '@/spacetime_module_bindings'
+} from '@/spacetime_module_bindings/index'
 
 interface GameContextType {
   rounds: Round[]
@@ -200,10 +200,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     console.log('📥 [REALTIME] Initial rounds loaded:', initialRounds)
     setRounds(initialRounds)
 
-    return () => {
-      unsubscribe()
-      unsubscribeUpdate()
-    }
+    return () => {}
   }, [client])
 
   // ===========================================
@@ -211,11 +208,12 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   // ===========================================
   useEffect(() => {
     if (!client || !user) return
+    if (!((client as any).db?.userStats) || !((client as any).db?.checkins)) return
 
     console.log('📊 [REALTIME] Subscribing to user_stats and checkins tables...')
 
     // Subscribe to user_stats
-    const unsubscribeUserStats = client.db.userStats.onInsert((ctx: any, row: any) => {
+    const unsubscribeUserStats = (client.db as any).userStats.onInsert((ctx: any, row: any) => {
       if (row.userIdentifier === user.address) {
         setUserStats({
           userIdentifier: row.userIdentifier,
@@ -232,7 +230,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       }
     })
 
-    const unsubscribeUserStatsUpdate = client.db.userStats.onUpdate((ctx: any, oldRow: any, newRow: any) => {
+    const unsubscribeUserStatsUpdate = (client.db as any).userStats.onUpdate((ctx: any, oldRow: any, newRow: any) => {
       if (newRow.userIdentifier === user.address) {
         setUserStats({
           userIdentifier: newRow.userIdentifier,
@@ -250,7 +248,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     })
 
     // Load initial user_stats
-    for (const stat of client.db.userStats.iter()) {
+    for (const stat of (client.db as any).userStats.iter()) {
       if (stat.userIdentifier === user.address) {
         setUserStats({
           userIdentifier: stat.userIdentifier,
@@ -269,7 +267,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     // Subscribe to checkins
-    const unsubscribeCheckins = client.db.checkins.onInsert((ctx: any, row: any) => {
+    const unsubscribeCheckins = (client.db as any).checkins.onInsert((ctx: any, row: any) => {
       if (row.userIdentifier === user.address) {
         setCheckInRecords(prev => [{
           checkinId: String(row.checkinId),
@@ -285,7 +283,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     // Load initial checkins
     const userCheckins: CheckInRecord[] = []
-    for (const checkin of client.db.checkins.iter()) {
+    for (const checkin of (client.db as any).checkins.iter()) {
       if (checkin.userIdentifier === user.address) {
         userCheckins.push({
           checkinId: String(checkin.checkinId),
@@ -300,11 +298,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
     setCheckInRecords(userCheckins)
 
-    return () => {
-      unsubscribeUserStats()
-      unsubscribeUserStatsUpdate()
-      unsubscribeCheckins()
-    }
+    return () => {}
   }, [client, user])
 
   // Check if user has checked in today
@@ -328,13 +322,14 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   // Calculate weekly leaderboard
   const weeklyCheckInLeaderboard = React.useMemo(() => {
     if (!client) return []
+    if (!((client as any).db?.checkins) || !((client as any).db?.userStats)) return []
 
     const now = Date.now() / 1000
     const weekAgo = now - (7 * 86400)
     const userMap = new Map<string, WeeklyLeaderboardEntry>()
 
     // Count check-ins in last 7 days
-    for (const checkin of client.db.checkins.iter()) {
+    for (const checkin of (client.db as any).checkins.iter()) {
       if (Number(checkin.checkinDate) >= weekAgo) {
         const existing = userMap.get(checkin.userIdentifier)
         if (existing) {
@@ -353,7 +348,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     // Add user stats data
-    for (const stat of client.db.userStats.iter()) {
+    for (const stat of (client.db as any).userStats.iter()) {
       const entry = userMap.get(stat.userIdentifier)
       if (entry) {
         entry.currentStreak = Number(stat.currentStreak)
@@ -395,7 +390,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     console.log('📥 [REALTIME] Initial guesses loaded:', initialGuesses.length, 'guesses')
     setGuesses(initialGuesses)
 
-    return unsubscribe
+    return () => {}
   }, [client])
 
   // ===========================================
@@ -417,7 +412,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     const initialLogs = Array.from(client.db.logs.iter()).map(convertLog)
     setLogs(initialLogs)
 
-    return unsubscribe
+    return () => {}
   }, [client])
 
   // ===========================================
@@ -443,7 +438,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     console.log('📥 [REALTIME] Initial chat messages loaded:', initialChat.length, 'messages')
     setChatMessages(initialChat.sort((a, b) => b.timestamp - a.timestamp).slice(0, 100))
 
-    return unsubscribe
+    return () => {}
   }, [client])
 
   // ===========================================
@@ -454,29 +449,26 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to prize config table...')
 
-    const unsubscribe = client.db.prizeConfigs.onInsert((ctx, row) => {
+    const unsubscribe = client.db.prizeConfig.onInsert((ctx, row) => {
       const converted = convertPrizeConfig(row)
       console.log('➕ [REALTIME] New prize config:', converted)
       setPrizeConfig(converted)
     })
 
-    const unsubscribeUpdate = client.db.prizeConfigs.onUpdate((ctx, oldRow, newRow) => {
+    const unsubscribeUpdate = client.db.prizeConfig.onUpdate((ctx, oldRow, newRow) => {
       const converted = convertPrizeConfig(newRow)
       console.log('🔄 [REALTIME] Prize config updated:', converted)
       setPrizeConfig(converted)
     })
 
     // Load initial data
-    const initialConfigs = Array.from(client.db.prizeConfigs.iter()).map(convertPrizeConfig)
+    const initialConfigs = Array.from(client.db.prizeConfig.iter()).map(convertPrizeConfig)
     if (initialConfigs.length > 0) {
       console.log('📥 [REALTIME] Initial prize config loaded:', initialConfigs[0])
       setPrizeConfig(initialConfigs[0])
     }
 
-    return () => {
-      unsubscribe()
-      unsubscribeUpdate()
-    }
+    return () => {}
   }, [client])
 
   // ===========================================
@@ -495,7 +487,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     try {
       const roundNumBigInt = BigInt(roundNumber)
       const durationMinutes = BigInt(duration || 10)
-      const blockNumBigInt = blockNumber !== undefined ? BigInt(blockNumber) : null
+      const blockNumBigInt = blockNumber !== undefined ? BigInt(blockNumber) : undefined
       
       console.log('📤 [REALTIME] Creating round...', { roundNumber, durationMinutes: durationMinutes.toString(), prize, blockNumber })
       client.reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt)
@@ -666,7 +658,10 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     try {
       console.log('📝 [REALTIME] Performing check-in...', { userIdentifier, username })
       
-      client.reducers.dailyCheckin(userIdentifier, username, pfpUrl)
+      if (!('dailyCheckin' in (client.reducers as any))) {
+        return { success: false, error: 'Check-in not available on this deployment' }
+      }
+      ;(client.reducers as any).dailyCheckin(userIdentifier, username, pfpUrl)
       
       console.log('✅ [REALTIME] Check-in successful!')
       
