@@ -8,11 +8,13 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
+import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import type { ChatMessage } from '@/types/game'
 
 export function GlobalChat(): JSX.Element {
-  const { user, activeRound, chatMessages, addChatMessage } = useGame()
+  const { activeRound, chatMessages, addChatMessage } = useGame()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [message, setMessage] = useState<string>('')
   const [sending, setSending] = useState<boolean>(false)

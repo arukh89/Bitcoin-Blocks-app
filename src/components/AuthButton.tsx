@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
+import { motion } from 'framer-motion'
+import type { User } from '@/types/game'
 import { sdk } from '@farcaster/miniapp-sdk'
 
 export function AuthButton(): JSX.Element {
@@ -20,7 +21,6 @@ export function AuthButton(): JSX.Element {
       const isMockMode = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost'
       
       if (isMockMode) {
-        // Auto-login as admin in mock mode
         console.log('🎯 [MOCK MODE] Auto-connecting as admin...')
         const adminAddress = '0x09D02D25D0D082f7F2E04b4838cEfe271b2daB09'
         await signInWithWallet(adminAddress)

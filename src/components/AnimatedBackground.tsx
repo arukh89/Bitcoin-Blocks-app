@@ -12,8 +12,11 @@ export function AnimatedBackground(): JSX.Element {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
+    const canvasEl = canvas as HTMLCanvasElement
+    const ctx2d = ctx as CanvasRenderingContext2D
+
+    canvasEl.width = window.innerWidth
+    canvasEl.height = window.innerHeight
 
     // Particle system
     class Particle {
@@ -25,8 +28,8 @@ export function AnimatedBackground(): JSX.Element {
       opacity: number
 
       constructor() {
-        this.x = Math.random() * canvas.width
-        this.y = Math.random() * canvas.height
+        this.x = Math.random() * canvasEl.width
+        this.y = Math.random() * canvasEl.height
         this.size = Math.random() * 2 + 0.5
         this.speedX = Math.random() * 0.5 - 0.25
         this.speedY = Math.random() * 0.5 - 0.25
@@ -37,18 +40,17 @@ export function AnimatedBackground(): JSX.Element {
         this.x += this.speedX
         this.y += this.speedY
 
-        if (this.x > canvas.width) this.x = 0
-        if (this.x < 0) this.x = canvas.width
-        if (this.y > canvas.height) this.y = 0
-        if (this.y < 0) this.y = canvas.height
+        if (this.x > canvasEl.width) this.x = 0
+        if (this.x < 0) this.x = canvasEl.width
+        if (this.y > canvasEl.height) this.y = 0
+        if (this.y < 0) this.y = canvasEl.height
       }
 
       draw(): void {
-        if (!ctx) return
-        ctx.fillStyle = `rgba(255, 120, 0, ${this.opacity})`
-        ctx.beginPath()
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-        ctx.fill()
+        ctx2d.fillStyle = `rgba(255, 120, 0, ${this.opacity})`
+        ctx2d.beginPath()
+        ctx2d.arc(this.x, this.y, this.size, 0, Math.PI * 2)
+        ctx2d.fill()
       }
     }
 
@@ -62,8 +64,8 @@ export function AnimatedBackground(): JSX.Element {
       opacity: number
 
       constructor() {
-        this.x = Math.random() * canvas.width
-        this.y = Math.random() * canvas.height
+        this.x = Math.random() * canvasEl.width
+        this.y = Math.random() * canvasEl.height
         this.size = Math.random() * 30 + 20
         this.angle = Math.random() * Math.PI * 2
         this.speed = Math.random() * 0.002 + 0.001
@@ -75,26 +77,25 @@ export function AnimatedBackground(): JSX.Element {
         this.x += Math.cos(this.angle) * 0.5
         this.y += Math.sin(this.angle) * 0.5
 
-        if (this.x > canvas.width + 50) this.x = -50
-        if (this.x < -50) this.x = canvas.width + 50
-        if (this.y > canvas.height + 50) this.y = -50
-        if (this.y < -50) this.y = canvas.height + 50
+        if (this.x > canvasEl.width + 50) this.x = -50
+        if (this.x < -50) this.x = canvasEl.width + 50
+        if (this.y > canvasEl.height + 50) this.y = -50
+        if (this.y < -50) this.y = canvasEl.height + 50
       }
 
       draw(): void {
-        if (!ctx) return
-        ctx.strokeStyle = `rgba(147, 51, 234, ${this.opacity})`
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-        ctx.stroke()
+        ctx2d.strokeStyle = `rgba(147, 51, 234, ${this.opacity})`
+        ctx2d.lineWidth = 2
+        ctx2d.beginPath()
+        ctx2d.arc(this.x, this.y, this.size, 0, Math.PI * 2)
+        ctx2d.stroke()
 
         // Draw chain link
-        ctx.fillStyle = `rgba(147, 51, 234, ${this.opacity * 0.5})`
-        ctx.font = `${this.size * 0.6}px Arial`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText('⛓', this.x, this.y)
+        ctx2d.fillStyle = `rgba(147, 51, 234, ${this.opacity * 0.5})`
+        ctx2d.font = `${this.size * 0.6}px Arial`
+        ctx2d.textAlign = 'center'
+        ctx2d.textBaseline = 'middle'
+        ctx2d.fillText('⛓', this.x, this.y)
       }
     }
 
@@ -113,9 +114,9 @@ export function AnimatedBackground(): JSX.Element {
 
     // Animation loop
     function animate(): void {
-      if (!ctx || !canvas) return
+      if (!ctx2d || !canvasEl) return
       
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx2d.clearRect(0, 0, canvasEl.width, canvasEl.height)
 
       // Draw connections between nearby particles
       particles.forEach((particle, index) => {
@@ -125,12 +126,12 @@ export function AnimatedBackground(): JSX.Element {
           const distance = Math.sqrt(dx * dx + dy * dy)
 
           if (distance < 100) {
-            ctx.strokeStyle = `rgba(255, 120, 0, ${0.1 * (1 - distance / 100)})`
-            ctx.lineWidth = 0.5
-            ctx.beginPath()
-            ctx.moveTo(particle.x, particle.y)
-            ctx.lineTo(otherParticle.x, otherParticle.y)
-            ctx.stroke()
+            ctx2d.strokeStyle = `rgba(255, 120, 0, ${0.1 * (1 - distance / 100)})`
+            ctx2d.lineWidth = 0.5
+            ctx2d.beginPath()
+            ctx2d.moveTo(particle.x, particle.y)
+            ctx2d.lineTo(otherParticle.x, otherParticle.y)
+            ctx2d.stroke()
           }
         })
       })
@@ -154,8 +155,8 @@ export function AnimatedBackground(): JSX.Element {
 
     // Handle resize
     const handleResize = (): void => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      canvasEl.width = window.innerWidth
+      canvasEl.height = window.innerHeight
     }
 
     window.addEventListener('resize', handleResize)

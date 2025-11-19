@@ -153,7 +153,7 @@ export default function Home(): JSX.Element {
                 </motion.h1>
                 <p className="text-orange-300 text-sm font-medium flex items-center gap-2">
                   <span className="inline-block w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
-                  Predicting Bitcoin's Next Block
+                  Predicting Bitcoin&apos;s Next Block
                 </p>
               </div>
               

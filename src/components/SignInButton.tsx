@@ -108,38 +108,8 @@ export function SignInButton(): JSX.Element {
             </DialogDescription>
           </DialogHeader>
 
-          {user ? (
-            // Authenticated - Show profile and sign out
-            <Card className="glass-card-dark border-green-500/30">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <img 
-                    src={user.pfpUrl} 
-                    alt={user.username}
-                    className="w-16 h-16 rounded-full ring-2 ring-green-500"
-                  />
-                  <div>
-                    <p className="font-bold text-lg">{user.displayName}</p>
-                    <p className="text-sm text-gray-400">@{user.username}</p>
-                    <Badge variant="outline" className="mt-1 bg-green-500/20 text-green-300 border-green-400/50">
-                      {authMode === 'farcaster-sdk' && '🟣 Farcaster Mini App'}
-                      {authMode === 'neynar' && '🔵 Neynar Web'}
-                      {authMode === 'wallet' && `💰 ${walletChain?.toUpperCase()}`}
-                    </Badge>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleSignOut}
-                  variant="destructive"
-                  className="w-full"
-                >
-                  Sign Out
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            // Not authenticated - Show auth options
-            <Tabs defaultValue="neynar" className="w-full">
+          {/* Auth options (shown when not authenticated) */}
+          <Tabs defaultValue="neynar" className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-gray-800">
                 <TabsTrigger value="neynar" className="text-white">
                   🟣 Farcaster (Web)
@@ -243,7 +213,6 @@ export function SignInButton(): JSX.Element {
                 </Card>
               </TabsContent>
             </Tabs>
-          )}
         </DialogContent>
       </Dialog>
     </>

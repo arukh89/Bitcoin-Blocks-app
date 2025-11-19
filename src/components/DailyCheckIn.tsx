@@ -10,14 +10,17 @@ import { Calendar, Flame, Trophy, Gift } from 'lucide-react'
 
 export function DailyCheckIn() {
   const { user } = useAuth()
-  const { performCheckIn, userCheckInData, isCheckingIn } = useGame()
+  const { checkIn, userStats, hasCheckedInToday } = useGame()
   const [showReward, setShowReward] = useState<boolean>(false)
+  const [isCheckingIn, setIsCheckingIn] = useState<boolean>(false)
 
   const handleCheckIn = async (): Promise<void> => {
     if (!user) return
     
-    const success = await performCheckIn()
-    if (success) {
+    setIsCheckingIn(true)
+    const res = await checkIn(user.address, user.username, user.pfpUrl)
+    setIsCheckingIn(false)
+    if (res.success) {
       setShowReward(true)
       setTimeout(() => setShowReward(false), 3000)
     }
@@ -27,9 +30,9 @@ export function DailyCheckIn() {
     return null
   }
 
-  const canCheckIn = userCheckInData ? !userCheckInData.hasCheckedInToday : true
-  const streak = userCheckInData?.currentStreak || 0
-  const totalPoints = userCheckInData?.totalPoints || 0
+  const canCheckIn = !hasCheckedInToday
+  const streak = userStats?.currentStreak || 0
+  const totalPoints = userStats?.totalPoints || 0
 
   return (
     <Card className="bg-gray-900 border-gray-800">
@@ -70,7 +73,7 @@ export function DailyCheckIn() {
 
         {!canCheckIn && (
           <div className="text-center text-sm text-green-400">
-            ✓ You've checked in today! Come back tomorrow.
+            ✓ You’ve checked in today! Come back tomorrow.
           </div>
         )}
 

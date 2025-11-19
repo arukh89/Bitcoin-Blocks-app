@@ -7,17 +7,19 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useGame } from '@/context/GameContext'
+import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 
 export function GuessForm(): JSX.Element {
-  const { user, activeRound, submitGuess, hasUserGuessed, connected } = useGame()
+  const { activeRound, submitGuess, hasUserGuessed, connected, getGuessesForRound } = useGame()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [guess, setGuess] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
 
   // Get user's guesses for active round
-  const userGuesses = activeRound 
-    ? useGame().getGuessesForRound(activeRound.id).filter(g => user && g.address.toLowerCase() === user.address.toLowerCase())
+  const userGuesses = activeRound
+    ? getGuessesForRound(activeRound.id).filter(g => user && g.address.toLowerCase() === user.address.toLowerCase())
     : []
 
   const isRoundLocked = activeRound?.status !== 'open'

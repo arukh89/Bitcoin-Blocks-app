@@ -9,13 +9,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { useGame, isDevAddress } from '@/context/GameContext'
+import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 // Removed APP_CONFIG - using pure realtime mode
 
 export default function AdminPage(): JSX.Element {
   const router = useRouter()
-  const { user, createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected } = useGame()
+  const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected } = useGame()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
 
@@ -71,10 +73,11 @@ export default function AdminPage(): JSX.Element {
     const now = Date.now()
     const endTime = now + (24 * 60 * 60 * 1000)
     const prize = `${jackpotAmount} ${jackpotCurrency}`
+    const nextRoundNumber = activeRound ? activeRound.roundNumber + 1 : 1
 
     try {
       setLoading(true)
-      await createRound(now, endTime, prize, blockNum)
+      await createRound(nextRoundNumber, now, endTime, prize, blockNum)
       
       // Auto-post to Farcaster
       const message = `🔔 New Round Started!\\n\\nGuess how many transactions will be in the next Bitcoin block ⛏️\\n\\n💰 Jackpot: ${prize}\\n🎯 Target Block: #${blockNum}\\n\\n#BitcoinBlocks`
@@ -586,11 +589,10 @@ export default function AdminPage(): JSX.Element {
                       Auto-Announcement
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      Starting rounds and posting results will automatically announce on Farcaster with formatted messages.
+                      Starting rounds and posting results will automatically announce on Farcaster when integrated.
                     </p>
                   </div>
                 </div>
-                {/* Mock mode note removed; always use real-time mode in this build */}
               </div>
             </CardContent>
           </Card>

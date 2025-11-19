@@ -7,12 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { useGame, isDevAddress } from '@/context/GameContext'
+import { useGame } from '@/context/GameContext'
+import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 // Removed APP_CONFIG - using pure realtime mode
 
 export function AdminPanel(): JSX.Element {
-  const { user, createRound, endRound, updateRoundResult, activeRound, rounds, getGuessesForRound, connected, client, prizeConfig } = useGame()
+  const { createRound, endRound, updateRoundResult, activeRound, rounds, getGuessesForRound, connected, client, prizeConfig } = useGame()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
   const [checkingBlock, setCheckingBlock] = useState<boolean>(false)
@@ -130,7 +132,7 @@ export function AdminPanel(): JSX.Element {
 
     try {
       setLoading(true)
-      await createRound(now, endTime, prize, blockNum)
+      await createRound(roundNum, now, endTime, prize, blockNum, durationMin)
       
       // Auto-post to Farcaster
       const farcasterPrize = `${jackpotAmount} ${prizeCurrency}`

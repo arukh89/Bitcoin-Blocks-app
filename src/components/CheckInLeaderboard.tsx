@@ -29,7 +29,7 @@ export function CheckInLeaderboard() {
 
             return (
               <div
-                key={`${entry.userIdentifier}-${entry.currentStreak}-${index}`}
+                key={`${entry.userIdentifier}-${entry.currentStreak}`}
                 className={`flex items-center gap-3 p-3 rounded-lg ${
                   isTopThree ? 'bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-500/30' : 'bg-gray-800'
                 }`}

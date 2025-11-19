@@ -32,6 +32,7 @@ export interface Guess {
   guess: number;
   pfpUrl: string;
   submittedAt: number;
+  isCurrentUser?: boolean;
 }
 
 export interface ChatMessage {
