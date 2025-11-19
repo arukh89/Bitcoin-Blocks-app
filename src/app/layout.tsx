@@ -37,11 +37,11 @@ export const metadata: Metadata = {
       'version': 'next',
       'imageUrl': 'https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/thumbnail_cmgifd2dg000204jp98x53ays-p9n6Mjcrk6gppFNpz3AczxHR2Yz5kR',
       'button': {
-        'title': 'Open with Ohara',
+        'title': 'Launch Bitcoin Blocks',
         'action': {
           'type': 'launch_frame',
           'name': 'Bitcoin Blocks',
-          'url': 'https://gas-aside-395.app.ohara.ai',
+          'url': 'https://bitcoin-blocks-app.vercel.app',
           'splashImageUrl': 'https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/farcaster/splash_images/splash_image1.svg',
           'splashBackgroundColor': '#ffffff'
         }
