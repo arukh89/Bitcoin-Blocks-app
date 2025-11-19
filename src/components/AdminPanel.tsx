@@ -130,7 +130,7 @@ export function AdminPanel(): JSX.Element {
 
     try {
       setLoading(true)
-      await createRound(roundNum, now, endTime, prize, blockNum, durationMin)
+      await createRound(now, endTime, prize, blockNum)
       
       // Auto-post to Farcaster
       const farcasterPrize = `${jackpotAmount} ${prizeCurrency}`
@@ -666,10 +666,7 @@ export function AdminPanel(): JSX.Element {
                 >
                   {loading ? '⚙️' : '📡'}
                   <span className="ml-1 text-xs">
-                    {loading 
-                      ? (APP_CONFIG.mode === 'mock' ? 'Simulating...' : 'Fetching...') 
-                      : 'Post Results'
-                    }
+                    {loading ? 'Fetching...' : 'Post Results'}
                   </span>
                 </Button>
               </div>
