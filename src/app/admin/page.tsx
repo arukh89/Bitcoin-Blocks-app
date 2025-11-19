@@ -586,26 +586,11 @@ export default function AdminPage(): JSX.Element {
                       Auto-Announcement
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      {APP_CONFIG.mode === 'mock' 
-                        ? 'In Mock Mode, Farcaster posts are simulated and logged to console.'
-                        : 'Starting rounds and posting results will automatically announce on Farcaster with formatted messages.'
-                      }
+                      Starting rounds and posting results will automatically announce on Farcaster with formatted messages.
                     </p>
                   </div>
                 </div>
-                {APP_CONFIG.mode === 'mock' && (
-                  <div className="flex items-start gap-2 pt-2 border-t border-cyan-500/20">
-                    <span className="text-yellow-400 mt-0.5">🧪</span>
-                    <div>
-                      <p className="text-sm text-yellow-300 font-bold">
-                        Mock Mode Active
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        All operations use simulated data. Switch to Real-Time mode in config for live Bitcoin data.
-                      </p>
-                    </div>
-                  </div>
-                )}
+                {/* Mock mode note removed; always use real-time mode in this build */}
               </div>
             </CardContent>
           </Card>
