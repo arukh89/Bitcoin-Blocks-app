@@ -26,3 +26,16 @@ pnpm-debug.log*
 
 # Spacetime
 /.spacetime
+
+# Rust server build artifacts
+/spacetime-server/target/
+/spacetime-server/Cargo.lock
+
+# TypeScript build info
+/tsconfig.tsbuildinfo
+
+# Local env dump files
+/env.*
+
+# Docs (may contain sensitive info)
+/docs/
