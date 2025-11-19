@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { useGame } from '@/context/GameContext'
 import { motion } from 'framer-motion'
-import type { User } from '@/types/game'
+import { useAuth } from '@/context/AuthContext'
 import { sdk } from '@farcaster/miniapp-sdk'
 
 export function AuthButton(): JSX.Element {
-  const { user, setUser } = useGame()
+  const { user, signInWithWallet } = useAuth()
   const [loading, setLoading] = useState<boolean>(false)
   const [isHovered, setIsHovered] = useState<boolean>(false)
 
@@ -24,13 +23,7 @@ export function AuthButton(): JSX.Element {
         // Auto-login as admin in mock mode
         console.log('🎯 [MOCK MODE] Auto-connecting as admin...')
         const adminAddress = '0x09D02D25D0D082f7F2E04b4838cEfe271b2daB09'
-        const userData: User = {
-          address: adminAddress,
-          username: 'admin',
-          displayName: 'Admin User',
-          pfpUrl: 'https://i.imgur.com/placeholder-admin.jpg'
-        }
-        setUser(userData)
+        await signInWithWallet(adminAddress)
         console.log('✅ [MOCK MODE] Connected as admin:', adminAddress)
         return
       }
@@ -49,14 +42,7 @@ export function AuthButton(): JSX.Element {
       // Get user context from Farcaster
       const context = await sdk.context
 
-      const userData: User = {
-        address: address,
-        username: context.user.username || address.slice(0, 8),
-        displayName: context.user.displayName || address.slice(0, 8),
-        pfpUrl: context.user.pfpUrl || ''
-      }
-
-      setUser(userData)
+      await signInWithWallet(address)
     } catch (error) {
       console.error('Failed to connect wallet:', error)
     } finally {
