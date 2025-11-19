@@ -30,45 +30,45 @@ import {
 } from "spacetimedb";
 
 // Import and reexport all reducer arg types
-import { CreateRound } from "./create_round_reducer.ts";
+import { CreateRound } from "./create_round_reducer";
 export { CreateRound };
-import { EndRoundManually } from "./end_round_manually_reducer.ts";
+import { EndRoundManually } from "./end_round_manually_reducer";
 export { EndRoundManually };
-import { GetActiveRound } from "./get_active_round_reducer.ts";
+import { GetActiveRound } from "./get_active_round_reducer";
 export { GetActiveRound };
-import { GetPrizeConfig } from "./get_prize_config_reducer.ts";
+import { GetPrizeConfig } from "./get_prize_config_reducer";
 export { GetPrizeConfig };
-import { SavePrizeConfig } from "./save_prize_config_reducer.ts";
+import { SavePrizeConfig } from "./save_prize_config_reducer";
 export { SavePrizeConfig };
-import { SendChatMessage } from "./send_chat_message_reducer.ts";
+import { SendChatMessage } from "./send_chat_message_reducer";
 export { SendChatMessage };
-import { SubmitGuess } from "./submit_guess_reducer.ts";
+import { SubmitGuess } from "./submit_guess_reducer";
 export { SubmitGuess };
-import { UpdateRoundResult } from "./update_round_result_reducer.ts";
+import { UpdateRoundResult } from "./update_round_result_reducer";
 export { UpdateRoundResult };
 
 // Import and reexport all table handle types
-import { ChatMessagesTableHandle } from "./chat_messages_table.ts";
+import { ChatMessagesTableHandle } from "./chat_messages_table";
 export { ChatMessagesTableHandle };
-import { GuessesTableHandle } from "./guesses_table.ts";
+import { GuessesTableHandle } from "./guesses_table";
 export { GuessesTableHandle };
-import { LogsTableHandle } from "./logs_table.ts";
+import { LogsTableHandle } from "./logs_table";
 export { LogsTableHandle };
-import { PrizeConfigTableHandle } from "./prize_config_table.ts";
+import { PrizeConfigTableHandle } from "./prize_config_table";
 export { PrizeConfigTableHandle };
-import { RoundsTableHandle } from "./rounds_table.ts";
+import { RoundsTableHandle } from "./rounds_table";
 export { RoundsTableHandle };
 
 // Import and reexport all types
-import { ChatMessage } from "./chat_message_type.ts";
+import { ChatMessage } from "./chat_message_type";
 export { ChatMessage };
-import { Guess } from "./guess_type.ts";
+import { Guess } from "./guess_type";
 export { Guess };
-import { LogEvent } from "./log_event_type.ts";
+import { LogEvent } from "./log_event_type";
 export { LogEvent };
-import { PrizeConfig } from "./prize_config_type.ts";
+import { PrizeConfig } from "./prize_config_type";
 export { PrizeConfig };
-import { Round } from "./round_type.ts";
+import { Round } from "./round_type";
 export { Round };
 
 const REMOTE_MODULE = {
