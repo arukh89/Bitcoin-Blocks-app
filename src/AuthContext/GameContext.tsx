@@ -132,6 +132,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [checkInRecords, setCheckInRecords] = useState<CheckInRecord[]>([])
   const [hasCheckedInToday, setHasCheckedInToday] = useState<boolean>(false)
+  const [weeklyCheckInLeaderboard, setWeeklyCheckInLeaderboard] = useState<WeeklyLeaderboardEntry[]>([])
 
   const activeRound = rounds.find(r => r.status === 'open') || null
 
@@ -319,10 +320,12 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     setHasCheckedInToday(!!todayCheckin)
   }, [checkInRecords])
 
-  // Calculate weekly leaderboard
-  const weeklyCheckInLeaderboard = React.useMemo(() => {
-    if (!client) return []
-    if (!((client as any).db?.checkins) || !((client as any).db?.userStats)) return []
+  // Calculate weekly leaderboard (recomputes when client or check-in records change)
+  useEffect(() => {
+    if (!client || !((client as any).db?.checkins) || !((client as any).db?.userStats)) {
+      setWeeklyCheckInLeaderboard([])
+      return
+    }
 
     const now = Date.now() / 1000
     const weekAgo = now - (7 * 86400)
@@ -356,15 +359,16 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       }
     }
 
-    // Convert to array and sort
-    return Array.from(userMap.values())
+    const leaderboard = Array.from(userMap.values())
       .sort((a, b) => {
         if (b.weeklyCheckins !== a.weeklyCheckins) {
           return b.weeklyCheckins - a.weeklyCheckins
         }
         return b.totalPoints - a.totalPoints
       })
-      .slice(0, 10) // Top 10
+      .slice(0, 10)
+
+    setWeeklyCheckInLeaderboard(leaderboard)
   }, [client, checkInRecords])
 
   // ===========================================

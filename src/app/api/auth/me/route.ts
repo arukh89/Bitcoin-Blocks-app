@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { createClient, Errors } from '@farcaster/quick-auth'
 
 const client = createClient()
@@ -20,14 +21,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       domain: process.env.NEXT_PUBLIC_HOST || 'localhost:3000'
     })
 
-    const userResponse = await fetch(
-      `https://api.farcaster.xyz/v2/user?fid=${payload.sub}`,
-      {
-        headers: {
-          'api-key': 'wc_secret_13ae99f53a4f0874277616da7b10bddf6d01a2ea5eac4d8c6380e877_9b6b2830'
-        }
+    const FARCASTER_API_KEY = process.env.FARCASTER_API_KEY
+    if (!FARCASTER_API_KEY) {
+      return NextResponse.json({ error: 'Server misconfiguration: FARCASTER_API_KEY is not set' }, { status: 500 })
+    }
+
+    const userResponse = await fetch(`https://api.farcaster.xyz/v2/user?fid=${payload.sub}`, {
+      headers: {
+        'api-key': FARCASTER_API_KEY
       }
-    )
+    })
 
     if (!userResponse.ok) {
       return NextResponse.json({

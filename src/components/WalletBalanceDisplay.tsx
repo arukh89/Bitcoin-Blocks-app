@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -19,7 +19,7 @@ export function WalletBalanceDisplay({ walletAddress }: WalletBalanceDisplayProp
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchBalances = async (): Promise<void> => {
+  const fetchBalances = useCallback(async (): Promise<void> => {
     setLoading(true)
     setError(null)
     
@@ -43,13 +43,13 @@ export function WalletBalanceDisplay({ walletAddress }: WalletBalanceDisplayProp
     } finally {
       setLoading(false)
     }
-  }
+  }, [walletAddress])
 
   useEffect(() => {
     if (walletAddress) {
-      fetchBalances()
+      void fetchBalances()
     }
-  }, [walletAddress])
+  }, [walletAddress, fetchBalances])
 
   if (error) {
     return (

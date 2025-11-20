@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 
-// Farcaster API key stored securely on backend only
-const FARCASTER_API_KEY = process.env.FARCASTER_API_KEY || 'wc_secret_13ae99f53a4f0874277616da7b10bddf6d01a2ea5eac4d8c6380e877_9b6b2830'
+// Farcaster (Warpcast) API key must be provided via environment variable on the server
+const FARCASTER_API_KEY = process.env.FARCASTER_API_KEY
 
 interface AnnouncementRequest {
   message: string
@@ -18,6 +19,12 @@ interface AnnouncementRequest {
  */
 export async function POST(request: Request): Promise<Response> {
   try {
+    if (!FARCASTER_API_KEY) {
+      return NextResponse.json(
+        { error: 'Server misconfiguration: FARCASTER_API_KEY is not set', success: false },
+        { status: 500 }
+      )
+    }
     const body = await request.json() as AnnouncementRequest
     const { message, address } = body
 
@@ -94,7 +101,7 @@ export async function POST(request: Request): Promise<Response> {
 export async function GET(): Promise<Response> {
   return NextResponse.json({
     enabled: true,
-    apiKeyConfigured: !!FARCASTER_API_KEY,
+    apiKeyConfigured: !!process.env.FARCASTER_API_KEY,
     devAddress: '0x09D02D25D0D082f7F2E04b4838cEfe271b2daB09'
   })
 }
