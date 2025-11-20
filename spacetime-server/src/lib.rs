@@ -271,13 +271,17 @@ pub fn save_prize_config(
         ctx.db.prize_config().delete(existing);
     }
 
+    // Enforce canonical currency and remove contract address usage per product decision
+    let enforced_currency = "$Seconds".to_string();
+    let enforced_contract = "".to_string();
+
     let row = PrizeConfig {
         config_id: 1,
         jackpot_amount,
         first_place_amount,
         second_place_amount,
-        currency_type,
-        token_contract_address,
+        currency_type: enforced_currency,
+        token_contract_address: enforced_contract,
         updated_at,
     };
     ctx.db.prize_config().insert(row);
