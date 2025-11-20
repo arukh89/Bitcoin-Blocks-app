@@ -14,6 +14,18 @@ export function isAdminFid(fid: number): boolean {
   return ADMIN_FIDS.includes(fid)
 }
 
+// Admin Wallet Addresses (lowercased)
+export const ADMIN_WALLETS: string[] = [
+  '0x09d02d25d0d082f7f2e04b4838cefe271b2dab09',
+  '0xc38b1633e152fc75da3ff737717c0da5ef291408'
+]
+
+export function isAdminWallet(address: string): boolean {
+  if (!address) return false
+  const a = address.toLowerCase()
+  return ADMIN_WALLETS.includes(a)
+}
+
 export type AuthMode = 'farcaster-sdk' | 'neynar' | 'wallet'
 
 interface AuthContextType {
@@ -117,7 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         username: `${address.slice(0, 6)}...${address.slice(-4)}`,
         displayName: `${address.slice(0, 6)}...${address.slice(-4)}`,
         pfpUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
-        isAdmin: false
+        // Wallet admins can access Admin UI; announcements remain FID-only in UI logic
+        isAdmin: isAdminWallet(address)
       }
       
       setUser(walletUser)
