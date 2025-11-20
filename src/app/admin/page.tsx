@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { useGame, isDevAddress } from '@/context/GameContext'
+import type { ChatMessage } from '@/types/game'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft, Loader2 } from 'lucide-react'
@@ -16,7 +17,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 
 export default function AdminPage(): JSX.Element {
   const router = useRouter()
-  const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected } = useGame()
+  const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected, addChatMessage } = useGame()
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
@@ -79,8 +80,8 @@ export default function AdminPage(): JSX.Element {
       setLoading(true)
       await createRound(nextRoundNumber, now, endTime, prize, blockNum)
       
-      // Auto-post to Farcaster
-      const message = `🔔 New Round Started!\\n\\nGuess how many transactions will be in the next Bitcoin block ⛏️\\n\\n💰 Jackpot: ${prize}\\n🎯 Target Block: #${blockNum}\\n\\n#BitcoinBlocks`
+      // Announce to Global Chat (FID only)
+      const message = `🔔 New Round Started!\n\nGuess how many transactions will be in the next Bitcoin block ⛏️\n\n💰 Jackpot: ${prize}\n🎯 Target Block: #${blockNum}\n\n#BitcoinBlocks`
       await handleAnnounce(message)
       
       toast({
@@ -214,15 +215,15 @@ export default function AdminPage(): JSX.Element {
 
         await updateRoundResult(activeRound.id, actualTxCount, blockHash, winner.address)
 
-        // Auto-post results to Farcaster
+        // Announce results to Global Chat (FID only)
         const newJackpot = `${jackpotAmount} ${jackpotCurrency}`
-        const message = `📊 Block #${activeRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\\n\\n🥇 Winner: @${winner.username}\\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\\n\\n💰 Jackpot is now: ${newJackpot}\\n\\n#BitcoinBlocks`
+        const message = `📊 Block #${activeRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\n\n🥇 Winner: @${winner.username}\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\n\n💰 Jackpot is now: ${newJackpot}\n\n#BitcoinBlocks`
         
         await handleAnnounce(message)
 
       toast({
         title: '🎉 Results Posted!',
-        description: `Winner: @${winner.username} - announced on Farcaster`
+        description: `Winner: @${winner.username} - announced in Global Chat`
       })
     } catch (error) {
       toast({
@@ -237,22 +238,21 @@ export default function AdminPage(): JSX.Element {
 
   const handleAnnounce = async (message: string): Promise<void> => {
     if (!user || !isDevAddress(user.address)) return
+    // Only allow FID-based accounts to announce
+    if (!user.address.startsWith('fid-')) return
 
     try {
-      const response = await fetch('/api/farcaster-announce', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          address: user.address
-        })
-      })
-
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to announce')
+      const chatMsg: ChatMessage = {
+        id: `sys-${Date.now()}`,
+        roundId: 'global',
+        address: user.address,
+        username: user.username,
+        message,
+        pfpUrl: user.pfpUrl,
+        timestamp: Date.now(),
+        type: 'system'
       }
+      await addChatMessage(chatMsg)
     } catch (error) {
       console.error('Announcement error:', error)
     }
@@ -362,7 +362,7 @@ export default function AdminPage(): JSX.Element {
                 <div>
                   <p className="text-white">Start New Round</p>
                   <p className="text-xs text-gray-400 font-normal mt-1">
-                    Opens new round for guesses & auto-posts to Farcaster
+                    Opens new round for guesses & auto-announces in Global Chat
                   </p>
                 </div>
               </CardTitle>
@@ -463,7 +463,7 @@ export default function AdminPage(): JSX.Element {
                   <div>
                     <p className="text-white">Post Results</p>
                     <p className="text-xs text-gray-400 font-normal mt-1">
-                      Pulls latest block data from mempool.space & posts formatted summary to Farcaster
+                      Pulls latest block data from mempool.space & posts formatted summary to Global Chat
                     </p>
                   </div>
                 </CardTitle>
@@ -589,7 +589,7 @@ export default function AdminPage(): JSX.Element {
                       Auto-Announcement
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      Starting rounds and posting results will automatically announce on Farcaster when integrated.
+                      Starting rounds and posting results will automatically announce in Global Chat.
                     </p>
                   </div>
                 </div>
