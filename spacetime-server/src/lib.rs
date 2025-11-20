@@ -127,7 +127,27 @@ pub fn create_round(
 }
 
 #[reducer]
-pub fn end_round_manually(_ctx: &ReducerContext, _round_id: u64) { }
+pub fn end_round_manually(ctx: &ReducerContext, round_id: u64) {
+    // Mark the round as closed (lock submissions)
+    for r in ctx.db.rounds().iter() {
+        if r.round_id == round_id {
+            let mut updated = r.clone();
+            updated.status = "closed".to_string();
+            ctx.db.rounds().delete(r);
+            ctx.db.rounds().insert(updated);
+            break;
+        }
+    }
+
+    // Log action
+    let ts = now_secs(ctx);
+    ctx.db.logs().insert(LogEvent {
+        log_id: 0,
+        event_type: "end_round_manually".to_string(),
+        details: format!("round_id={}", round_id),
+        timestamp: ts,
+    });
+}
 
 #[reducer]
 pub fn get_active_round(_ctx: &ReducerContext) {
@@ -218,12 +238,40 @@ pub fn update_round_result(
     block_hash: String,
     winning_fid: i64,
 ) {
-    // Log only; table updates omitted for portability
+    // Update the round row with results and mark as finished
+    let mut found = false;
+    for r in ctx.db.rounds().iter() {
+        if r.round_id == round_id {
+            let mut updated = r.clone();
+            updated.status = "finished".to_string();
+            updated.actual_tx_count = Some(actual_tx_count);
+            updated.block_hash = Some(block_hash.clone());
+            updated.winning_fid = Some(winning_fid);
+
+            ctx.db.rounds().delete(r);
+            ctx.db.rounds().insert(updated);
+            found = true;
+            break;
+        }
+    }
+
+    // Log the update
     let ts = now_secs(ctx);
+    let details = if found {
+        format!(
+            "updated round_id={};txcount={};winner={}",
+            round_id, actual_tx_count, winning_fid
+        )
+    } else {
+        format!(
+            "round not found: round_id={};txcount={};winner={}",
+            round_id, actual_tx_count, winning_fid
+        )
+    };
     ctx.db.logs().insert(LogEvent {
         log_id: 0,
         event_type: "update_round_result".to_string(),
-        details: format!("round_id={};txcount={};winner={}", round_id, actual_tx_count, winning_fid),
+        details,
         timestamp: ts,
     });
 }
