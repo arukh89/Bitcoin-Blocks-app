@@ -8,12 +8,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { useGame } from '@/context/GameContext'
+import type { ChatMessage } from '@/types/game'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 // Removed APP_CONFIG - using pure realtime mode
 
 export function AdminPanel(): JSX.Element {
-  const { createRound, endRound, updateRoundResult, activeRound, rounds, getGuessesForRound, connected, client, prizeConfig } = useGame()
+  const { createRound, endRound, updateRoundResult, activeRound, rounds, getGuessesForRound, connected, client, prizeConfig, addChatMessage } = useGame()
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
@@ -134,7 +135,7 @@ export function AdminPanel(): JSX.Element {
       setLoading(true)
       await createRound(roundNum, now, endTime, prize, blockNum, durationMin)
       
-      // Auto-post to Farcaster
+      // Announce to Global Chat (FID only)
       const farcasterPrize = `${jackpotAmount} ${prizeCurrency}`
       const message = `🔔 Round #${roundNum} Started!\n\nGuess how many transactions will be in the next Bitcoin block ⛏️\n\n💰 Jackpot: ${farcasterPrize}\n🎯 Target Block: #${blockNum}\n⏱ Duration: ${durationMin} minutes\n\n#BitcoinBlocks`
       await handleAnnounce(message)
@@ -291,7 +292,7 @@ export function AdminPanel(): JSX.Element {
 
       await updateRoundResult(closedRound.id, actualTxCount, blockHash, winner.address)
 
-      // Auto-post results to Farcaster
+      // Announce results to Global Chat (FID only)
       const newJackpot = `${jackpotAmount} ${prizeCurrency}`
       const message = `📊 Block #${closedRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\n\n🥇 Winner: @${winner.username}\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\n\n💰 Jackpot is now: ${newJackpot}\n\n#BitcoinBlocks`
       
@@ -319,20 +320,20 @@ export function AdminPanel(): JSX.Element {
     }
 
     try {
-      const response = await fetch('/api/farcaster-announce', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          address: user.address
-        })
-      })
+      // Only allow FID-based accounts to announce
+      if (!user.address.startsWith('fid-')) return
 
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to announce')
+      const chatMsg: ChatMessage = {
+        id: `sys-${Date.now()}`,
+        roundId: 'global',
+        address: user.address,
+        username: user.username,
+        message,
+        pfpUrl: user.pfpUrl,
+        timestamp: Date.now(),
+        type: 'system'
       }
+      await addChatMessage(chatMsg)
     } catch (error) {
       console.error('Announcement error:', error)
     }

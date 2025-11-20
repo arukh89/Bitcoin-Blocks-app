@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import type { Round, Guess, Log, User, ChatMessage, PrizeConfiguration } from '@/types/game'
 import type { UserStats, CheckInRecord, WeeklyLeaderboardEntry, CheckInResult } from '@/types/checkin'
-import { useAuth, ADMIN_FIDS, isAdminFid } from '@/context/AuthContext'
+import { useAuth, ADMIN_FIDS, isAdminFid, ADMIN_WALLETS, isAdminWallet } from '@/context/AuthContext'
 
 // Real-time client import
 import { connectToSpacetime, type DbConnection } from '@/lib/spacetime-client'
@@ -41,13 +41,17 @@ interface GameContextType {
 
 const GameContext = createContext<GameContextType | undefined>(undefined)
 
-export { ADMIN_FIDS, isAdminFid }
+export { ADMIN_FIDS, isAdminFid, ADMIN_WALLETS, isAdminWallet }
 
 export function isDevAddress(addr: string): boolean {
   if (!addr) return false
   if (addr.startsWith('fid-')) {
     const fid = Number(addr.slice(4))
     return isAdminFid(fid)
+  }
+  // Wallet admin support
+  if (/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+    return isAdminWallet(addr)
   }
   return false
 }
