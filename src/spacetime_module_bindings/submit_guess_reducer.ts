@@ -25,6 +25,7 @@ import {
   type EventContextInterface as __EventContextInterface,
   type ReducerEventContextInterface as __ReducerEventContextInterface,
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
 export type SubmitGuess = {
@@ -34,6 +35,8 @@ export type SubmitGuess = {
   guess: bigint,
   pfpUrl: string | undefined,
 };
+let _cached_SubmitGuess_type_value: __AlgebraicTypeType | null = null;
+
 /**
  * An object for generated helper functions.
  */
@@ -43,15 +46,16 @@ export const SubmitGuess = {
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    return __AlgebraicTypeValue.Product({
-      elements: [
-        { name: "roundId", algebraicType: __AlgebraicTypeValue.U64},
-        { name: "fid", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "username", algebraicType: __AlgebraicTypeValue.String},
-        { name: "guess", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "pfpUrl", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.String)},
-      ]
-    });
+    if (_cached_SubmitGuess_type_value) return _cached_SubmitGuess_type_value;
+    _cached_SubmitGuess_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_SubmitGuess_type_value.value.elements.push(
+      { name: "roundId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "fid", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "username", algebraicType: __AlgebraicTypeValue.String },
+      { name: "guess", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "pfpUrl", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.String) },
+    );
+    return _cached_SubmitGuess_type_value;
   },
 
   serialize(writer: __BinaryWriter, value: SubmitGuess): void {

@@ -25,6 +25,7 @@ import {
   type EventContextInterface as __EventContextInterface,
   type ReducerEventContextInterface as __ReducerEventContextInterface,
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
 export type CreateRound = {
@@ -33,6 +34,8 @@ export type CreateRound = {
   prize: string,
   blockNumber: bigint | undefined,
 };
+let _cached_CreateRound_type_value: __AlgebraicTypeType | null = null;
+
 /**
  * An object for generated helper functions.
  */
@@ -42,14 +45,15 @@ export const CreateRound = {
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    return __AlgebraicTypeValue.Product({
-      elements: [
-        { name: "roundNumber", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "durationMinutes", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "prize", algebraicType: __AlgebraicTypeValue.String},
-        { name: "blockNumber", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64)},
-      ]
-    });
+    if (_cached_CreateRound_type_value) return _cached_CreateRound_type_value;
+    _cached_CreateRound_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_CreateRound_type_value.value.elements.push(
+      { name: "roundNumber", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "durationMinutes", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "prize", algebraicType: __AlgebraicTypeValue.String },
+      { name: "blockNumber", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64) },
+    );
+    return _cached_CreateRound_type_value;
   },
 
   serialize(writer: __BinaryWriter, value: CreateRound): void {

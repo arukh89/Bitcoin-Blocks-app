@@ -28,47 +28,58 @@ import {
   type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-export type SendChatMessage = {
-  roundId: string,
-  address: string,
+export type UserStat = {
+  statId: bigint,
+  userIdentifier: string,
   username: string,
-  message: string,
   pfpUrl: string,
-  msgType: string,
+  totalPoints: bigint,
+  currentStreak: bigint,
+  longestStreak: bigint,
+  lastCheckinDate: bigint,
+  totalCheckins: bigint,
+  createdAt: bigint,
+  updatedAt: bigint,
 };
-let _cached_SendChatMessage_type_value: __AlgebraicTypeType | null = null;
+let _cached_UserStat_type_value: __AlgebraicTypeType | null = null;
 
 /**
  * An object for generated helper functions.
  */
-export const SendChatMessage = {
+export const UserStat = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    if (_cached_SendChatMessage_type_value) return _cached_SendChatMessage_type_value;
-    _cached_SendChatMessage_type_value = __AlgebraicTypeValue.Product({ elements: [] });
-    _cached_SendChatMessage_type_value.value.elements.push(
-      { name: "roundId", algebraicType: __AlgebraicTypeValue.String },
-      { name: "address", algebraicType: __AlgebraicTypeValue.String },
+    if (_cached_UserStat_type_value) return _cached_UserStat_type_value;
+    _cached_UserStat_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_UserStat_type_value.value.elements.push(
+      { name: "statId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "userIdentifier", algebraicType: __AlgebraicTypeValue.String },
       { name: "username", algebraicType: __AlgebraicTypeValue.String },
-      { name: "message", algebraicType: __AlgebraicTypeValue.String },
       { name: "pfpUrl", algebraicType: __AlgebraicTypeValue.String },
-      { name: "msgType", algebraicType: __AlgebraicTypeValue.String },
+      { name: "totalPoints", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "currentStreak", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "longestStreak", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "lastCheckinDate", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "totalCheckins", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "createdAt", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "updatedAt", algebraicType: __AlgebraicTypeValue.I64 },
     );
-    return _cached_SendChatMessage_type_value;
+    return _cached_UserStat_type_value;
   },
 
-  serialize(writer: __BinaryWriter, value: SendChatMessage): void {
-    __AlgebraicTypeValue.serializeValue(writer, SendChatMessage.getTypeScriptAlgebraicType(), value);
+  serialize(writer: __BinaryWriter, value: UserStat): void {
+    __AlgebraicTypeValue.serializeValue(writer, UserStat.getTypeScriptAlgebraicType(), value);
   },
 
-  deserialize(reader: __BinaryReader): SendChatMessage {
-    return __AlgebraicTypeValue.deserializeValue(reader, SendChatMessage.getTypeScriptAlgebraicType());
+  deserialize(reader: __BinaryReader): UserStat {
+    return __AlgebraicTypeValue.deserializeValue(reader, UserStat.getTypeScriptAlgebraicType());
   },
 
 }
 
-export default SendChatMessage;
+export default UserStat;
+
 

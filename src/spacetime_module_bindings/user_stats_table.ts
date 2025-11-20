@@ -27,26 +27,26 @@ import {
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
   type TableHandle as __TableHandle,
 } from "spacetimedb";
-import { Guess } from "./guess_type";
+import { UserStat } from "./user_stat_type";
 import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
 declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
 /**
- * Table handle for the table `guesses`.
+ * Table handle for the table `user_stats`.
  *
- * Obtain a handle from the [`guesses`] property on [`RemoteTables`],
- * like `ctx.db.guesses`.
+ * Obtain a handle from the [`userStats`] property on [`RemoteTables`],
+ * like `ctx.db.userStats`.
  *
  * Users are encouraged not to explicitly reference this type,
  * but to directly chain method calls,
- * like `ctx.db.guesses.on_insert(...)`.
+ * like `ctx.db.userStats.on_insert(...)`.
  */
-export class GuessesTableHandle<TableName extends string> implements __TableHandle<TableName> {
+export class UserStatsTableHandle<TableName extends string> implements __TableHandle<TableName> {
   // phantom type to track the table name
   readonly tableName!: TableName;
-  tableCache: __TableCache<Guess>;
+  tableCache: __TableCache<UserStat>;
 
-  constructor(tableCache: __TableCache<Guess>) {
+  constructor(tableCache: __TableCache<UserStat>) {
     this.tableCache = tableCache;
   }
 
@@ -54,53 +54,75 @@ export class GuessesTableHandle<TableName extends string> implements __TableHand
     return this.tableCache.count();
   }
 
-  iter(): Iterable<Guess> {
+  iter(): Iterable<UserStat> {
     return this.tableCache.iter();
   }
   /**
-   * Access to the `guessId` unique index on the table `guesses`,
+   * Access to the `statId` unique index on the table `user_stats`,
    * which allows point queries on the field of the same name
-   * via the [`GuessesGuessIdUnique.find`] method.
+   * via the [`UserStatsStatIdUnique.find`] method.
    *
    * Users are encouraged not to explicitly reference this type,
    * but to directly chain method calls,
-   * like `ctx.db.guesses.guessId().find(...)`.
+   * like `ctx.db.userStats.statId().find(...)`.
    *
-   * Get a handle on the `guessId` unique index on the table `guesses`.
+   * Get a handle on the `statId` unique index on the table `user_stats`.
    */
-  guessId = {
-    // Find the subscribed row whose `guessId` column value is equal to `col_val`,
+  statId = {
+    // Find the subscribed row whose `statId` column value is equal to `col_val`,
     // if such a row is present in the client cache.
-    find: (col_val: bigint): Guess | undefined => {
+    find: (col_val: bigint): UserStat | undefined => {
       for (let row of this.tableCache.iter()) {
-        if (__deepEqual(row.guessId, col_val)) {
+        if (__deepEqual(row.statId, col_val)) {
+          return row;
+        }
+      }
+    },
+  };
+  /**
+   * Access to the `userIdentifier` unique index on the table `user_stats`,
+   * which allows point queries on the field of the same name
+   * via the [`UserStatsUserIdentifierUnique.find`] method.
+   *
+   * Users are encouraged not to explicitly reference this type,
+   * but to directly chain method calls,
+   * like `ctx.db.userStats.userIdentifier().find(...)`.
+   *
+   * Get a handle on the `userIdentifier` unique index on the table `user_stats`.
+   */
+  userIdentifier = {
+    // Find the subscribed row whose `userIdentifier` column value is equal to `col_val`,
+    // if such a row is present in the client cache.
+    find: (col_val: string): UserStat | undefined => {
+      for (let row of this.tableCache.iter()) {
+        if (__deepEqual(row.userIdentifier, col_val)) {
           return row;
         }
       }
     },
   };
 
-  onInsert = (cb: (ctx: EventContext, row: Guess) => void) => {
+  onInsert = (cb: (ctx: EventContext, row: UserStat) => void) => {
     return this.tableCache.onInsert(cb);
   }
 
-  removeOnInsert = (cb: (ctx: EventContext, row: Guess) => void) => {
+  removeOnInsert = (cb: (ctx: EventContext, row: UserStat) => void) => {
     return this.tableCache.removeOnInsert(cb);
   }
 
-  onDelete = (cb: (ctx: EventContext, row: Guess) => void) => {
+  onDelete = (cb: (ctx: EventContext, row: UserStat) => void) => {
     return this.tableCache.onDelete(cb);
   }
 
-  removeOnDelete = (cb: (ctx: EventContext, row: Guess) => void) => {
+  removeOnDelete = (cb: (ctx: EventContext, row: UserStat) => void) => {
     return this.tableCache.removeOnDelete(cb);
   }
 
   // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Guess, newRow: Guess) => void) => {
+  onUpdate = (cb: (ctx: EventContext, oldRow: UserStat, newRow: UserStat) => void) => {
     return this.tableCache.onUpdate(cb);
   }
 
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Guess, newRow: Guess) => void) => {
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: UserStat, newRow: UserStat) => void) => {
     return this.tableCache.removeOnUpdate(cb);
   }}
