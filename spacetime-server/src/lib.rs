@@ -5,6 +5,7 @@
 // Tables and reducers aligned with generated TypeScript bindings under src/spacetime_module_bindings
 
 use spacetimedb::{reducer, table, ReducerContext, Table};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // Chat messages table
 #[table(name = chat_messages, public)]
@@ -86,8 +87,15 @@ pub struct Round {
 
 // --- Reducers ---
 
-// Helper: naive "now" placeholder (0); replace with real time source if available
-fn now_millis() -> i64 { 0 }
+// Helper: return current timestamp in SECONDS based on reducer context
+// Frontend converts seconds -> ms
+fn now_secs(_ctx: &ReducerContext) -> i64 {
+    // Fallback to host time; sufficient for ordering/countdowns
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
 
 #[reducer]
 pub fn create_round(
@@ -97,8 +105,9 @@ pub fn create_round(
     prize: String,
     block_number: Option<i64>,
 ) {
-    let start = now_millis();
-    let end = start + duration_minutes.saturating_mul(60 * 1000);
+    let start = now_secs(ctx);
+    // Store seconds in DB; frontend multiplies by 1000
+    let end = start + duration_minutes.saturating_mul(60);
 
     ctx.db.rounds().insert(Round {
         round_id: 0, // auto_inc
@@ -139,8 +148,12 @@ pub fn save_prize_config(
     currency_type: String,
     token_contract_address: String,
 ) {
-    let updated_at = now_millis();
-    // Upsert row with id = 1 (best-effort)
+    let updated_at = now_secs(ctx);
+    // Upsert row with id = 1: delete any existing then insert fresh
+    for existing in ctx.db.prize_config().iter() {
+        ctx.db.prize_config().delete(existing);
+    }
+
     let row = PrizeConfig {
         config_id: 1,
         jackpot_amount,
@@ -150,7 +163,7 @@ pub fn save_prize_config(
         token_contract_address,
         updated_at,
     };
-    let _ = ctx.db.prize_config().try_insert(row);
+    ctx.db.prize_config().insert(row);
 }
 
 #[reducer]
@@ -163,7 +176,7 @@ pub fn send_chat_message(
     pfp_url: String,
     msg_type: String,
 ) {
-    let ts = now_millis();
+    let ts = now_secs(ctx);
     ctx.db.chat_messages().insert(ChatMessage {
         chat_id: 0, // auto_inc
         round_id,
@@ -185,7 +198,7 @@ pub fn submit_guess(
     guess: i64,
     pfp_url: Option<String>,
 ) {
-    let ts = now_millis();
+    let ts = now_secs(ctx);
     ctx.db.guesses().insert(Guess {
         guess_id: 0, // auto_inc
         round_id,
@@ -206,7 +219,7 @@ pub fn update_round_result(
     winning_fid: i64,
 ) {
     // Log only; table updates omitted for portability
-    let ts = now_millis();
+    let ts = now_secs(ctx);
     ctx.db.logs().insert(LogEvent {
         log_id: 0,
         event_type: "update_round_result".to_string(),
