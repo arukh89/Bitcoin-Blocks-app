@@ -17,7 +17,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 
 export default function AdminPage(): JSX.Element {
   const router = useRouter()
-  const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected } = useGame()
+  const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected, addChatMessage } = useGame()
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
