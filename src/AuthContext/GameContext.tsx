@@ -71,7 +71,7 @@ function convertRound(r: STDBRound): Round {
     status: r.status as 'open' | 'closed' | 'finished',
     blockNumber: r.blockNumber ? Number(r.blockNumber) : undefined,
     actualTxCount: r.actualTxCount ? Number(r.actualTxCount) : undefined,
-    winningAddress: r.winningFid ? `0x${r.winningFid.toString(16).padStart(40, '0')}` : undefined,
+    winningAddress: r.winningFid ? `fid-${r.winningFid.toString()}` : undefined,
     blockHash: r.blockHash || undefined,
     createdAt: toMillis(r.createdAt),
     duration: Number(r.durationMinutes)
@@ -82,7 +82,7 @@ function convertGuess(g: STDBGuess): Guess {
   return {
     id: String(g.guessId),
     roundId: String(g.roundId),
-    address: `0x${g.fid.toString(16).padStart(40, '0')}`,
+    address: `fid-${g.fid.toString()}`,
     username: g.username,
     guess: Number(g.guess),
     pfpUrl: g.pfpUrl || '',
@@ -537,18 +537,25 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     try {
-      // Convert hex address to BigInt (remove 0x prefix first)
-      const addressHex = address.toLowerCase().startsWith('0x') ? address.slice(2) : address
-      const addressBigInt = BigInt('0x' + addressHex)
-      
+      // Require FID-based address ("fid-<number>") for submissions
+      if (!address.startsWith('fid-')) {
+        console.warn('⚠️ [REALTIME] Guess requires Farcaster login (FID-only)')
+        return false
+      }
+      const fidNum = Number(address.slice(4))
+      if (!Number.isFinite(fidNum) || fidNum <= 0) {
+        console.warn('⚠️ [REALTIME] Invalid FID in address:', address)
+        return false
+      }
+
       client.reducers.submitGuess(
         BigInt(roundId),
-        addressBigInt,
+        BigInt(fidNum),
         username,
         BigInt(guess),
         pfpUrl || undefined
       )
-      
+
       console.log('✅ [REALTIME] Guess submitted!')
       return true
     } catch (error) {
@@ -589,15 +596,20 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       throw new Error('Not connected to database')
     }
     
-    // Convert hex address to BigInt (remove 0x prefix first)
-    const addressHex = winningAddress.toLowerCase().startsWith('0x') ? winningAddress.slice(2) : winningAddress
-    const winningAddressBigInt = BigInt('0x' + addressHex)
-    
+    // Expect fid-based winner address
+    if (!winningAddress.startsWith('fid-')) {
+      throw new Error('Winner address must be FID-based (fid-<number>)')
+    }
+    const fidNum = Number(winningAddress.slice(4))
+    if (!Number.isFinite(fidNum) || fidNum <= 0) {
+      throw new Error('Invalid winner FID')
+    }
+
     client.reducers.updateRoundResult(
       BigInt(roundId),
       BigInt(actualTxCount),
       blockHash,
-      winningAddressBigInt
+      BigInt(fidNum)
     )
     
     console.log('✅ [REALTIME] Round result updated!')

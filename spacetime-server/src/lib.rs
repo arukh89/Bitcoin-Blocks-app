@@ -4,8 +4,9 @@
 // Bitcoin Blocks SpacetimeDB module (maincloud)
 // Tables and reducers aligned with generated TypeScript bindings under src/spacetime_module_bindings
 
-use spacetimedb::{reducer, table, ReducerContext, Table};
-use std::time::{SystemTime, UNIX_EPOCH};
+use spacetimedb::{reducer, table, ReducerContext, Table, Timestamp, ScheduleAt};
+use core::time::Duration;
+use std::time::UNIX_EPOCH;
 
 // Chat messages table
 #[table(name = chat_messages, public)]
@@ -85,14 +86,24 @@ pub struct Round {
     pub created_at: i64,
 }
 
+// Scheduled timer to periodically enforce round state (auto-close)
+#[table(name = round_timer, scheduled(tick_rounds))]
+#[derive(Clone, Debug)]
+pub struct RoundTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
 // --- Reducers ---
 
 // Helper: return current timestamp in SECONDS based on reducer context
 // Frontend converts seconds -> ms
-fn now_secs(_ctx: &ReducerContext) -> i64 {
-    // Fallback to host time; sufficient for ordering/countdowns
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
+fn now_secs(ctx: &ReducerContext) -> i64 {
+    // Use reducer invocation timestamp (host-provided) and convert to seconds
+    let st: std::time::SystemTime = ctx.timestamp.into();
+    st.duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
 }
@@ -108,6 +119,16 @@ pub fn create_round(
     let start = now_secs(ctx);
     // Store seconds in DB; frontend multiplies by 1000
     let end = start + duration_minutes.saturating_mul(60);
+
+    // Ensure periodic timer exists even on upgraded deployments
+    let mut has_timer = false;
+    for _t in ctx.db.round_timer().iter() { has_timer = true; break; }
+    if !has_timer {
+        ctx.db.round_timer().insert(RoundTimer {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Interval(Duration::from_secs(5).into()),
+        });
+    }
 
     ctx.db.rounds().insert(Round {
         round_id: 0, // auto_inc
@@ -126,8 +147,68 @@ pub fn create_round(
     });
 }
 
+// Run once on first publish (and when clearing data). Start periodic timer.
+#[reducer(init)]
+pub fn init(ctx: &ReducerContext) {
+    // Ensure exactly one periodic timer exists (every 5 seconds)
+    let mut has_timer = false;
+    for _t in ctx.db.round_timer().iter() { has_timer = true; break; }
+    if !has_timer {
+        ctx.db.round_timer().insert(RoundTimer {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Interval(Duration::from_secs(5).into()),
+        });
+    }
+}
+
+// Scheduled reducer: close any rounds whose end_time has passed
 #[reducer]
-pub fn end_round_manually(_ctx: &ReducerContext, _round_id: u64) { }
+pub fn tick_rounds(ctx: &ReducerContext, _timer: RoundTimer) {
+    let now = now_secs(ctx);
+    // Iterate and close overdue open rounds
+    let mut closed_count = 0i64;
+    for r in ctx.db.rounds().iter() {
+        if r.status == "open" && r.end_time <= now {
+            let mut updated = r.clone();
+            updated.status = "closed".to_string();
+            ctx.db.rounds().delete(r);
+            ctx.db.rounds().insert(updated);
+            closed_count += 1;
+        }
+    }
+
+    if closed_count > 0 {
+        ctx.db.logs().insert(LogEvent {
+            log_id: 0,
+            event_type: "auto_close_rounds".to_string(),
+            details: format!("closed={} at {}", closed_count, now),
+            timestamp: now,
+        });
+    }
+}
+
+#[reducer]
+pub fn end_round_manually(ctx: &ReducerContext, round_id: u64) {
+    // Mark the round as closed (lock submissions)
+    for r in ctx.db.rounds().iter() {
+        if r.round_id == round_id {
+            let mut updated = r.clone();
+            updated.status = "closed".to_string();
+            ctx.db.rounds().delete(r);
+            ctx.db.rounds().insert(updated);
+            break;
+        }
+    }
+
+    // Log action
+    let ts = now_secs(ctx);
+    ctx.db.logs().insert(LogEvent {
+        log_id: 0,
+        event_type: "end_round_manually".to_string(),
+        details: format!("round_id={}", round_id),
+        timestamp: ts,
+    });
+}
 
 #[reducer]
 pub fn get_active_round(_ctx: &ReducerContext) {
@@ -218,12 +299,40 @@ pub fn update_round_result(
     block_hash: String,
     winning_fid: i64,
 ) {
-    // Log only; table updates omitted for portability
+    // Update the round row with results and mark as finished
+    let mut found = false;
+    for r in ctx.db.rounds().iter() {
+        if r.round_id == round_id {
+            let mut updated = r.clone();
+            updated.status = "finished".to_string();
+            updated.actual_tx_count = Some(actual_tx_count);
+            updated.block_hash = Some(block_hash.clone());
+            updated.winning_fid = Some(winning_fid);
+
+            ctx.db.rounds().delete(r);
+            ctx.db.rounds().insert(updated);
+            found = true;
+            break;
+        }
+    }
+
+    // Log the update
     let ts = now_secs(ctx);
+    let details = if found {
+        format!(
+            "updated round_id={};txcount={};winner={}",
+            round_id, actual_tx_count, winning_fid
+        )
+    } else {
+        format!(
+            "round not found: round_id={};txcount={};winner={}",
+            round_id, actual_tx_count, winning_fid
+        )
+    };
     ctx.db.logs().insert(LogEvent {
         log_id: 0,
         event_type: "update_round_result".to_string(),
-        details: format!("round_id={};txcount={};winner={}", round_id, actual_tx_count, winning_fid),
+        details,
         timestamp: ts,
     });
 }
