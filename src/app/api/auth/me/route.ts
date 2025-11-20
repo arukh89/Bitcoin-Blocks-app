@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 import { createClient, Errors } from '@farcaster/quick-auth'
 
 const client = createClient()

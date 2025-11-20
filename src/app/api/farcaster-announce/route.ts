@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
 
 // Farcaster (Warpcast) API key must be provided via environment variable on the server
 const FARCASTER_API_KEY = process.env.FARCASTER_API_KEY
