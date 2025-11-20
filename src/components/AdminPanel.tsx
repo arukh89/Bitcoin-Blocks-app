@@ -28,7 +28,7 @@ export function AdminPanel(): JSX.Element {
   const [jackpotAmount, setJackpotAmount] = useState<string>('')
   const [firstPrize, setFirstPrize] = useState<string>('')
   const [secondPrize, setSecondPrize] = useState<string>('')
-  const [prizeCurrency, setPrizeCurrency] = useState<string>('')
+  const [prizeCurrency, setPrizeCurrency] = useState<string>('$Seconds')
 
   // Load saved prize config on mount
   useEffect(() => {
@@ -36,13 +36,13 @@ export function AdminPanel(): JSX.Element {
       setJackpotAmount(String(prizeConfig.jackpotAmount))
       setFirstPrize(String(prizeConfig.firstPlaceAmount))
       setSecondPrize(String(prizeConfig.secondPlaceAmount))
-      setPrizeCurrency(prizeConfig.currencyType)
+      setPrizeCurrency('$Seconds')
     } else {
       // Set defaults if no config exists
       setJackpotAmount('5000')
       setFirstPrize('1000')
       setSecondPrize('500')
-      setPrizeCurrency('$SECOND')
+      setPrizeCurrency('$Seconds')
     }
   }, [prizeConfig])
 
@@ -136,7 +136,7 @@ export function AdminPanel(): JSX.Element {
       await createRound(roundNum, now, endTime, prize, blockNum, durationMin)
       
       // Announce to Global Chat (FID only)
-      const farcasterPrize = `${jackpotAmount} ${prizeCurrency}`
+      const farcasterPrize = `${jackpotAmount} ${'$Seconds'}`
       const message = `🔔 Round #${roundNum} Started!\n\nGuess how many transactions will be in the next Bitcoin block ⛏️\n\n💰 Jackpot: ${farcasterPrize}\n🎯 Target Block: #${blockNum}\n⏱ Duration: ${durationMin} minutes\n\n#BitcoinBlocks`
       await handleAnnounce(message)
       
@@ -737,9 +737,10 @@ export function AdminPanel(): JSX.Element {
                 <Label className="text-gray-300 text-sm">Prize Currency</Label>
                 <Input
                   type="text"
-                  placeholder="$SECOND, USDC, ETH"
+                  placeholder="$Seconds"
                   value={prizeCurrency}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency('$Seconds')}
+                  disabled
                   className="bg-gray-800/50 border-gray-600/50 text-white"
                 />
               </div>

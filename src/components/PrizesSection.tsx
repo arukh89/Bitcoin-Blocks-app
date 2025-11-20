@@ -11,7 +11,7 @@ interface PrizesSectionProps {
 export default function PrizesSection({
   firstPrize = '1,000',
   secondPrize = '500',
-  currency = '$SECOND'
+  currency = '$Seconds'
 }: PrizesSectionProps): React.ReactElement {
   return (
     <div className="w-full animate-fade-in">

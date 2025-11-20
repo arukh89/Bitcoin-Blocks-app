@@ -205,7 +205,7 @@ export default function Home(): JSX.Element {
                     }}
                     transition={{ duration: 2, repeat: Infinity }}
                   >
-                    {prizeConfig ? `${Number(prizeConfig.jackpotAmount).toLocaleString()} ${prizeConfig.currencyType}` : '5,000 $SECOND'}
+                    {prizeConfig ? `${Number(prizeConfig.jackpotAmount).toLocaleString()} ${prizeConfig.currencyType}` : '5,000 $Seconds'}
                   </motion.p>
                 </CardContent>
               </Card>
@@ -215,7 +215,7 @@ export default function Home(): JSX.Element {
             <PrizesAndRulesSection 
               firstPrize={prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : '1,000'}
               secondPrize={prizeConfig ? Number(prizeConfig.secondPlaceAmount).toLocaleString() : '500'}
-              currency={prizeConfig?.currencyType || '$SECOND'}
+              currency={prizeConfig?.currencyType || '$Seconds'}
             />
 
             {/* Current Round - New Simplified Design */}
