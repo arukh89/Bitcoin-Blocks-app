@@ -25,6 +25,7 @@ import {
   type EventContextInterface as __EventContextInterface,
   type ReducerEventContextInterface as __ReducerEventContextInterface,
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
 export type Guess = {
@@ -36,6 +37,8 @@ export type Guess = {
   pfpUrl: string | undefined,
   submittedAt: bigint,
 };
+let _cached_Guess_type_value: __AlgebraicTypeType | null = null;
+
 /**
  * An object for generated helper functions.
  */
@@ -45,17 +48,18 @@ export const Guess = {
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    return __AlgebraicTypeValue.Product({
-      elements: [
-        { name: "guessId", algebraicType: __AlgebraicTypeValue.U64},
-        { name: "roundId", algebraicType: __AlgebraicTypeValue.U64},
-        { name: "fid", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "username", algebraicType: __AlgebraicTypeValue.String},
-        { name: "guess", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "pfpUrl", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.String)},
-        { name: "submittedAt", algebraicType: __AlgebraicTypeValue.I64},
-      ]
-    });
+    if (_cached_Guess_type_value) return _cached_Guess_type_value;
+    _cached_Guess_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_Guess_type_value.value.elements.push(
+      { name: "guessId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "roundId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "fid", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "username", algebraicType: __AlgebraicTypeValue.String },
+      { name: "guess", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "pfpUrl", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.String) },
+      { name: "submittedAt", algebraicType: __AlgebraicTypeValue.I64 },
+    );
+    return _cached_Guess_type_value;
   },
 
   serialize(writer: __BinaryWriter, value: Guess): void {

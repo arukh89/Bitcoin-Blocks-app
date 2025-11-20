@@ -25,6 +25,7 @@ import {
   type EventContextInterface as __EventContextInterface,
   type ReducerEventContextInterface as __ReducerEventContextInterface,
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
 export type Round = {
@@ -42,6 +43,8 @@ export type Round = {
   blockHash: string | undefined,
   createdAt: bigint,
 };
+let _cached_Round_type_value: __AlgebraicTypeType | null = null;
+
 /**
  * An object for generated helper functions.
  */
@@ -51,23 +54,24 @@ export const Round = {
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    return __AlgebraicTypeValue.Product({
-      elements: [
-        { name: "roundId", algebraicType: __AlgebraicTypeValue.U64},
-        { name: "roundNumber", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "startTime", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "endTime", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "durationMinutes", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "prize", algebraicType: __AlgebraicTypeValue.String},
-        { name: "status", algebraicType: __AlgebraicTypeValue.String},
-        { name: "blockNumber", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64)},
-        { name: "actualTxCount", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64)},
-        { name: "winningFid", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64)},
-        { name: "secondPlaceWinnerFid", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64)},
-        { name: "blockHash", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.String)},
-        { name: "createdAt", algebraicType: __AlgebraicTypeValue.I64},
-      ]
-    });
+    if (_cached_Round_type_value) return _cached_Round_type_value;
+    _cached_Round_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_Round_type_value.value.elements.push(
+      { name: "roundId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "roundNumber", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "startTime", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "endTime", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "durationMinutes", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "prize", algebraicType: __AlgebraicTypeValue.String },
+      { name: "status", algebraicType: __AlgebraicTypeValue.String },
+      { name: "blockNumber", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64) },
+      { name: "actualTxCount", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64) },
+      { name: "winningFid", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64) },
+      { name: "secondPlaceWinnerFid", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.I64) },
+      { name: "blockHash", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.String) },
+      { name: "createdAt", algebraicType: __AlgebraicTypeValue.I64 },
+    );
+    return _cached_Round_type_value;
   },
 
   serialize(writer: __BinaryWriter, value: Round): void {

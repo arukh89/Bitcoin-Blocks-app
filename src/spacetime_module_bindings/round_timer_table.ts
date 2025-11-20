@@ -27,26 +27,26 @@ import {
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
   type TableHandle as __TableHandle,
 } from "spacetimedb";
-import { Guess } from "./guess_type";
+import { RoundTimer } from "./round_timer_type";
 import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
 declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
 /**
- * Table handle for the table `guesses`.
+ * Table handle for the table `round_timer`.
  *
- * Obtain a handle from the [`guesses`] property on [`RemoteTables`],
- * like `ctx.db.guesses`.
+ * Obtain a handle from the [`roundTimer`] property on [`RemoteTables`],
+ * like `ctx.db.roundTimer`.
  *
  * Users are encouraged not to explicitly reference this type,
  * but to directly chain method calls,
- * like `ctx.db.guesses.on_insert(...)`.
+ * like `ctx.db.roundTimer.on_insert(...)`.
  */
-export class GuessesTableHandle<TableName extends string> implements __TableHandle<TableName> {
+export class RoundTimerTableHandle<TableName extends string> implements __TableHandle<TableName> {
   // phantom type to track the table name
   readonly tableName!: TableName;
-  tableCache: __TableCache<Guess>;
+  tableCache: __TableCache<RoundTimer>;
 
-  constructor(tableCache: __TableCache<Guess>) {
+  constructor(tableCache: __TableCache<RoundTimer>) {
     this.tableCache = tableCache;
   }
 
@@ -54,53 +54,53 @@ export class GuessesTableHandle<TableName extends string> implements __TableHand
     return this.tableCache.count();
   }
 
-  iter(): Iterable<Guess> {
+  iter(): Iterable<RoundTimer> {
     return this.tableCache.iter();
   }
   /**
-   * Access to the `guessId` unique index on the table `guesses`,
+   * Access to the `scheduledId` unique index on the table `round_timer`,
    * which allows point queries on the field of the same name
-   * via the [`GuessesGuessIdUnique.find`] method.
+   * via the [`RoundTimerScheduledIdUnique.find`] method.
    *
    * Users are encouraged not to explicitly reference this type,
    * but to directly chain method calls,
-   * like `ctx.db.guesses.guessId().find(...)`.
+   * like `ctx.db.roundTimer.scheduledId().find(...)`.
    *
-   * Get a handle on the `guessId` unique index on the table `guesses`.
+   * Get a handle on the `scheduledId` unique index on the table `round_timer`.
    */
-  guessId = {
-    // Find the subscribed row whose `guessId` column value is equal to `col_val`,
+  scheduledId = {
+    // Find the subscribed row whose `scheduledId` column value is equal to `col_val`,
     // if such a row is present in the client cache.
-    find: (col_val: bigint): Guess | undefined => {
+    find: (col_val: bigint): RoundTimer | undefined => {
       for (let row of this.tableCache.iter()) {
-        if (__deepEqual(row.guessId, col_val)) {
+        if (__deepEqual(row.scheduledId, col_val)) {
           return row;
         }
       }
     },
   };
 
-  onInsert = (cb: (ctx: EventContext, row: Guess) => void) => {
+  onInsert = (cb: (ctx: EventContext, row: RoundTimer) => void) => {
     return this.tableCache.onInsert(cb);
   }
 
-  removeOnInsert = (cb: (ctx: EventContext, row: Guess) => void) => {
+  removeOnInsert = (cb: (ctx: EventContext, row: RoundTimer) => void) => {
     return this.tableCache.removeOnInsert(cb);
   }
 
-  onDelete = (cb: (ctx: EventContext, row: Guess) => void) => {
+  onDelete = (cb: (ctx: EventContext, row: RoundTimer) => void) => {
     return this.tableCache.onDelete(cb);
   }
 
-  removeOnDelete = (cb: (ctx: EventContext, row: Guess) => void) => {
+  removeOnDelete = (cb: (ctx: EventContext, row: RoundTimer) => void) => {
     return this.tableCache.removeOnDelete(cb);
   }
 
   // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Guess, newRow: Guess) => void) => {
+  onUpdate = (cb: (ctx: EventContext, oldRow: RoundTimer, newRow: RoundTimer) => void) => {
     return this.tableCache.onUpdate(cb);
   }
 
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Guess, newRow: Guess) => void) => {
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: RoundTimer, newRow: RoundTimer) => void) => {
     return this.tableCache.removeOnUpdate(cb);
   }}

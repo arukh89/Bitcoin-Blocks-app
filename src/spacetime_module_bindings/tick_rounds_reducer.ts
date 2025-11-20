@@ -28,44 +28,41 @@ import {
   type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-export type LogEvent = {
-  logId: bigint,
-  eventType: string,
-  details: string,
-  timestamp: bigint,
+import { RoundTimer } from "./round_timer_type";
+// Mark import as potentially unused
+declare type __keep_RoundTimer = RoundTimer;
+
+export type TickRounds = {
+  timer: RoundTimer,
 };
-let _cached_LogEvent_type_value: __AlgebraicTypeType | null = null;
+let _cached_TickRounds_type_value: __AlgebraicTypeType | null = null;
 
 /**
  * An object for generated helper functions.
  */
-export const LogEvent = {
+export const TickRounds = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    if (_cached_LogEvent_type_value) return _cached_LogEvent_type_value;
-    _cached_LogEvent_type_value = __AlgebraicTypeValue.Product({ elements: [] });
-    _cached_LogEvent_type_value.value.elements.push(
-      { name: "logId", algebraicType: __AlgebraicTypeValue.U64 },
-      { name: "eventType", algebraicType: __AlgebraicTypeValue.String },
-      { name: "details", algebraicType: __AlgebraicTypeValue.String },
-      { name: "timestamp", algebraicType: __AlgebraicTypeValue.I64 },
+    if (_cached_TickRounds_type_value) return _cached_TickRounds_type_value;
+    _cached_TickRounds_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_TickRounds_type_value.value.elements.push(
+      { name: "timer", algebraicType: RoundTimer.getTypeScriptAlgebraicType() },
     );
-    return _cached_LogEvent_type_value;
+    return _cached_TickRounds_type_value;
   },
 
-  serialize(writer: __BinaryWriter, value: LogEvent): void {
-    __AlgebraicTypeValue.serializeValue(writer, LogEvent.getTypeScriptAlgebraicType(), value);
+  serialize(writer: __BinaryWriter, value: TickRounds): void {
+    __AlgebraicTypeValue.serializeValue(writer, TickRounds.getTypeScriptAlgebraicType(), value);
   },
 
-  deserialize(reader: __BinaryReader): LogEvent {
-    return __AlgebraicTypeValue.deserializeValue(reader, LogEvent.getTypeScriptAlgebraicType());
+  deserialize(reader: __BinaryReader): TickRounds {
+    return __AlgebraicTypeValue.deserializeValue(reader, TickRounds.getTypeScriptAlgebraicType());
   },
 
 }
 
-export default LogEvent;
-
+export default TickRounds;
 

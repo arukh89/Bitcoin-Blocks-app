@@ -25,6 +25,7 @@ import {
   type EventContextInterface as __EventContextInterface,
   type ReducerEventContextInterface as __ReducerEventContextInterface,
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
 export type PrizeConfig = {
@@ -36,6 +37,8 @@ export type PrizeConfig = {
   tokenContractAddress: string,
   updatedAt: bigint,
 };
+let _cached_PrizeConfig_type_value: __AlgebraicTypeType | null = null;
+
 /**
  * An object for generated helper functions.
  */
@@ -45,17 +48,18 @@ export const PrizeConfig = {
   * This function is derived from the AlgebraicType used to generate this type.
   */
   getTypeScriptAlgebraicType(): __AlgebraicTypeType {
-    return __AlgebraicTypeValue.Product({
-      elements: [
-        { name: "configId", algebraicType: __AlgebraicTypeValue.U8},
-        { name: "jackpotAmount", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "firstPlaceAmount", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "secondPlaceAmount", algebraicType: __AlgebraicTypeValue.I64},
-        { name: "currencyType", algebraicType: __AlgebraicTypeValue.String},
-        { name: "tokenContractAddress", algebraicType: __AlgebraicTypeValue.String},
-        { name: "updatedAt", algebraicType: __AlgebraicTypeValue.I64},
-      ]
-    });
+    if (_cached_PrizeConfig_type_value) return _cached_PrizeConfig_type_value;
+    _cached_PrizeConfig_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_PrizeConfig_type_value.value.elements.push(
+      { name: "configId", algebraicType: __AlgebraicTypeValue.U8 },
+      { name: "jackpotAmount", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "firstPlaceAmount", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "secondPlaceAmount", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "currencyType", algebraicType: __AlgebraicTypeValue.String },
+      { name: "tokenContractAddress", algebraicType: __AlgebraicTypeValue.String },
+      { name: "updatedAt", algebraicType: __AlgebraicTypeValue.I64 },
+    );
+    return _cached_PrizeConfig_type_value;
   },
 
   serialize(writer: __BinaryWriter, value: PrizeConfig): void {

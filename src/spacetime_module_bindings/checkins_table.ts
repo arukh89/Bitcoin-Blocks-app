@@ -27,26 +27,26 @@ import {
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
   type TableHandle as __TableHandle,
 } from "spacetimedb";
-import { Guess } from "./guess_type";
+import { CheckIn } from "./check_in_type";
 import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
 declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
 /**
- * Table handle for the table `guesses`.
+ * Table handle for the table `checkins`.
  *
- * Obtain a handle from the [`guesses`] property on [`RemoteTables`],
- * like `ctx.db.guesses`.
+ * Obtain a handle from the [`checkins`] property on [`RemoteTables`],
+ * like `ctx.db.checkins`.
  *
  * Users are encouraged not to explicitly reference this type,
  * but to directly chain method calls,
- * like `ctx.db.guesses.on_insert(...)`.
+ * like `ctx.db.checkins.on_insert(...)`.
  */
-export class GuessesTableHandle<TableName extends string> implements __TableHandle<TableName> {
+export class CheckinsTableHandle<TableName extends string> implements __TableHandle<TableName> {
   // phantom type to track the table name
   readonly tableName!: TableName;
-  tableCache: __TableCache<Guess>;
+  tableCache: __TableCache<CheckIn>;
 
-  constructor(tableCache: __TableCache<Guess>) {
+  constructor(tableCache: __TableCache<CheckIn>) {
     this.tableCache = tableCache;
   }
 
@@ -54,53 +54,53 @@ export class GuessesTableHandle<TableName extends string> implements __TableHand
     return this.tableCache.count();
   }
 
-  iter(): Iterable<Guess> {
+  iter(): Iterable<CheckIn> {
     return this.tableCache.iter();
   }
   /**
-   * Access to the `guessId` unique index on the table `guesses`,
+   * Access to the `checkinId` unique index on the table `checkins`,
    * which allows point queries on the field of the same name
-   * via the [`GuessesGuessIdUnique.find`] method.
+   * via the [`CheckinsCheckinIdUnique.find`] method.
    *
    * Users are encouraged not to explicitly reference this type,
    * but to directly chain method calls,
-   * like `ctx.db.guesses.guessId().find(...)`.
+   * like `ctx.db.checkins.checkinId().find(...)`.
    *
-   * Get a handle on the `guessId` unique index on the table `guesses`.
+   * Get a handle on the `checkinId` unique index on the table `checkins`.
    */
-  guessId = {
-    // Find the subscribed row whose `guessId` column value is equal to `col_val`,
+  checkinId = {
+    // Find the subscribed row whose `checkinId` column value is equal to `col_val`,
     // if such a row is present in the client cache.
-    find: (col_val: bigint): Guess | undefined => {
+    find: (col_val: bigint): CheckIn | undefined => {
       for (let row of this.tableCache.iter()) {
-        if (__deepEqual(row.guessId, col_val)) {
+        if (__deepEqual(row.checkinId, col_val)) {
           return row;
         }
       }
     },
   };
 
-  onInsert = (cb: (ctx: EventContext, row: Guess) => void) => {
+  onInsert = (cb: (ctx: EventContext, row: CheckIn) => void) => {
     return this.tableCache.onInsert(cb);
   }
 
-  removeOnInsert = (cb: (ctx: EventContext, row: Guess) => void) => {
+  removeOnInsert = (cb: (ctx: EventContext, row: CheckIn) => void) => {
     return this.tableCache.removeOnInsert(cb);
   }
 
-  onDelete = (cb: (ctx: EventContext, row: Guess) => void) => {
+  onDelete = (cb: (ctx: EventContext, row: CheckIn) => void) => {
     return this.tableCache.onDelete(cb);
   }
 
-  removeOnDelete = (cb: (ctx: EventContext, row: Guess) => void) => {
+  removeOnDelete = (cb: (ctx: EventContext, row: CheckIn) => void) => {
     return this.tableCache.removeOnDelete(cb);
   }
 
   // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Guess, newRow: Guess) => void) => {
+  onUpdate = (cb: (ctx: EventContext, oldRow: CheckIn, newRow: CheckIn) => void) => {
     return this.tableCache.onUpdate(cb);
   }
 
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Guess, newRow: Guess) => void) => {
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: CheckIn, newRow: CheckIn) => void) => {
     return this.tableCache.removeOnUpdate(cb);
   }}

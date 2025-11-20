@@ -8,6 +8,40 @@ use spacetimedb::{reducer, table, ReducerContext, Table, Timestamp, ScheduleAt};
 use core::time::Duration;
 use std::time::UNIX_EPOCH;
 
+// Check-ins: daily points + streaks
+#[table(name = checkins, public)]
+#[derive(Clone, Debug)]
+pub struct CheckIn {
+    #[primary_key]
+    #[auto_inc]
+    pub checkin_id: u64,
+    pub user_identifier: String,
+    pub username: String,
+    pub pfp_url: String,
+    pub checkin_date: i64,
+    pub points_earned: i64,
+    pub streak_count: i64,
+}
+
+#[table(name = user_stats, public)]
+#[derive(Clone, Debug)]
+pub struct UserStat {
+    #[primary_key]
+    #[auto_inc]
+    pub stat_id: u64,
+    #[unique]
+    pub user_identifier: String,
+    pub username: String,
+    pub pfp_url: String,
+    pub total_points: i64,
+    pub current_streak: i64,
+    pub longest_streak: i64,
+    pub last_checkin_date: i64,
+    pub total_checkins: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
 // Chat messages table
 #[table(name = chat_messages, public)]
 #[derive(Clone, Debug)]
@@ -107,6 +141,8 @@ fn now_secs(ctx: &ReducerContext) -> i64 {
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
 }
+
+fn day_start(ts: i64) -> i64 { ts - (ts % 86_400) }
 
 #[reducer]
 pub fn create_round(
@@ -334,5 +370,91 @@ pub fn update_round_result(
         event_type: "update_round_result".to_string(),
         details,
         timestamp: ts,
+    });
+}
+
+// Daily check-in with streaks and points
+#[reducer]
+pub fn daily_checkin(
+    ctx: &ReducerContext,
+    user_identifier: String,
+    username: String,
+    pfp_url: String,
+) {
+    let now = now_secs(ctx);
+    let today = day_start(now);
+
+    // If already checked in today, no-op
+    for c in ctx.db.checkins().iter() {
+        if c.user_identifier == user_identifier && day_start(c.checkin_date) == today {
+            return;
+        }
+    }
+
+    // Load existing user stats (if any)
+    let mut existing: Option<UserStat> = None;
+    for s in ctx.db.user_stats().iter() {
+        if s.user_identifier == user_identifier {
+            existing = Some(s.clone());
+            break;
+        }
+    }
+
+    let (new_streak, total_checkins, total_points, longest_streak) = if let Some(mut s) = existing {
+        let last_day = day_start(s.last_checkin_date);
+        let yesterday = today - 86_400;
+        let new_streak = if last_day == yesterday { s.current_streak + 1 } else if last_day < yesterday { 1 } else { s.current_streak };
+        let points = 10 + (new_streak * 2);
+        s.current_streak = new_streak;
+        s.total_points += points;
+        if s.current_streak > s.longest_streak { s.longest_streak = s.current_streak; }
+        s.last_checkin_date = now;
+        s.total_checkins += 1;
+        s.updated_at = now;
+        s.username = username.clone();
+        s.pfp_url = pfp_url.clone();
+        // Replace row (update semantics)
+        let pk = s.stat_id;
+        for row in ctx.db.user_stats().iter() { if row.stat_id == pk { ctx.db.user_stats().delete(row); break; } }
+        ctx.db.user_stats().insert(s.clone());
+        (new_streak, s.total_checkins, s.total_points, s.longest_streak)
+    } else {
+        let points = 10 + 2; // base + day-1 bonus
+        let s = UserStat {
+            stat_id: 0,
+            user_identifier: user_identifier.clone(),
+            username: username.clone(),
+            pfp_url: pfp_url.clone(),
+            total_points: points,
+            current_streak: 1,
+            longest_streak: 1,
+            last_checkin_date: now,
+            total_checkins: 1,
+            created_at: now,
+            updated_at: now,
+        };
+        ctx.db.user_stats().insert(s);
+        (1, 1, points, 1)
+    };
+
+    let points_earned = 10 + (new_streak * 2);
+    ctx.db.checkins().insert(CheckIn {
+        checkin_id: 0,
+        user_identifier: user_identifier.clone(),
+        username: username.clone(),
+        pfp_url: pfp_url.clone(),
+        checkin_date: now,
+        points_earned,
+        streak_count: new_streak,
+    });
+
+    ctx.db.logs().insert(LogEvent {
+        log_id: 0,
+        event_type: "daily_checkin".to_string(),
+        details: format!(
+            "user={} streak={} points_earned={} total_points={} total_checkins={} longest_streak={}",
+            user_identifier, new_streak, points_earned, total_points, total_checkins, longest_streak
+        ),
+        timestamp: now,
     });
 }
