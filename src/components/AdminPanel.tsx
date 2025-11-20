@@ -528,7 +528,7 @@ export function AdminPanel(): JSX.Element {
                 <span className="text-xl">🚀</span>
                 <h3 className="text-base font-bold text-white">Start New Round</h3>
               </div>
-              <p className="text-xs text-gray-400">Opens new round for guesses & auto-posts to Farcaster</p>
+              <p className="text-xs text-gray-400">Opens new round for guesses & auto-announces in Global Chat</p>
 
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -764,7 +764,7 @@ export function AdminPanel(): JSX.Element {
           {/* Info Note */}
           <div className="glass-card-dark p-4 rounded-xl border border-cyan-500/30">
             <p className="text-sm text-cyan-300">
-              <span className="font-bold">ℹ️ Auto-Announcement:</span> Starting rounds and posting results will automatically announce on Farcaster with formatted messages.
+              <span className="font-bold">ℹ️ Auto-Announcement:</span> Starting rounds and posting results will automatically announce in Global Chat with formatted messages.
             </p>
           </div>
         </CardContent>
