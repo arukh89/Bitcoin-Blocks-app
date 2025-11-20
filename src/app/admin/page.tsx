@@ -223,7 +223,7 @@ export default function AdminPage(): JSX.Element {
 
       toast({
         title: '🎉 Results Posted!',
-        description: `Winner: @${winner.username} - announced on Farcaster`
+        description: `Winner: @${winner.username} - announced in Global Chat`
       })
     } catch (error) {
       toast({
