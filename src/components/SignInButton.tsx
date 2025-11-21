@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -17,16 +17,25 @@ export function SignInButton(): JSX.Element {
   const [showDialog, setShowDialog] = useState<boolean>(false)
   const [neynarUrl, setNeynarUrl] = useState<string>('')
   const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
+  const didAutoWalletRef = useRef(false)
   
   // Wagmi hooks for wallet connection
   const { address, isConnected } = useAccount()
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
 
-  // Auto sign in when wallet connects
-  if (isConnected && address && !user) {
-    signInWithWallet(address)
-  }
+  // Auto sign in when wallet connects (web only), guarded to avoid re-login after sign out
+  useEffect(() => {
+    if (didAutoWalletRef.current) return
+    if (!isConnected || !address || user) return
+    if (isInFarcaster) return // never auto wallet in mini app
+    try {
+      const skip = typeof window !== 'undefined' ? window.sessionStorage.getItem('bb_skip_auto_wallet') : null
+      if (skip === '1') return
+    } catch {}
+    didAutoWalletRef.current = true
+    void signInWithWallet(address)
+  }, [isConnected, address, user, isInFarcaster, signInWithWallet])
 
   const handleNeynarSignIn = async (): Promise<void> => {
     try {
@@ -53,6 +62,12 @@ export function SignInButton(): JSX.Element {
   }
 
   const handleSignOut = (): void => {
+    try {
+      // prevent auto wallet relogin this session
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('bb_skip_auto_wallet', '1')
+      }
+    } catch {}
     signOut()
     if (isConnected) {
       disconnect()
@@ -110,13 +125,15 @@ export function SignInButton(): JSX.Element {
 
           {/* Auth options (shown when not authenticated) */}
           <Tabs defaultValue="neynar" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+              <TabsList className={`grid w-full ${!isInFarcaster ? 'grid-cols-2' : 'grid-cols-1'} bg-gray-800`}>
                 <TabsTrigger value="neynar" className="text-white">
-                  🟣 Farcaster (Web)
+                  🟣 Farcaster
                 </TabsTrigger>
-                <TabsTrigger value="wallet" className="text-white">
-                  💰 Wallet
-                </TabsTrigger>
+                {!isInFarcaster && (
+                  <TabsTrigger value="wallet" className="text-white">
+                    💰 Wallet
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* Neynar Tab */}
@@ -160,6 +177,7 @@ export function SignInButton(): JSX.Element {
               </TabsContent>
 
               {/* Wallet Tab */}
+              {!isInFarcaster && (
               <TabsContent value="wallet" className="space-y-4">
                 <Card className="glass-card-dark border-blue-500/30">
                   <CardContent className="pt-6 space-y-4">
@@ -212,6 +230,7 @@ export function SignInButton(): JSX.Element {
                   </CardContent>
                 </Card>
               </TabsContent>
+              )}
             </Tabs>
         </DialogContent>
       </Dialog>

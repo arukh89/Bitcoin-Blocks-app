@@ -6,10 +6,12 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/context/AuthContext'
 import { motion } from 'framer-motion'
 import type { User } from '@/types/game'
-import { sdk } from '@farcaster/miniapp-sdk'
+import sdk from '@farcaster/miniapp-sdk'
+import { useDisconnect } from 'wagmi'
 
 export function AuthButton(): JSX.Element {
   const { user, signInWithWallet, logout } = useAuth()
+  const { disconnect } = useDisconnect()
   const [loading, setLoading] = useState<boolean>(false)
   const [isHovered, setIsHovered] = useState<boolean>(false)
 
@@ -74,6 +76,12 @@ export function AuthButton(): JSX.Element {
     )
   }
 
+  const handleSignOutClick = (): void => {
+    try { if (typeof window !== 'undefined') window.sessionStorage.setItem('bb_skip_auto_wallet', '1') } catch {}
+    disconnect()
+    logout()
+  }
+
   return (
     <motion.div
       className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-gradient-to-r from-orange-500/20 to-purple-500/20 backdrop-blur-xl border border-white/20 shadow-lg"
@@ -98,7 +106,7 @@ export function AuthButton(): JSX.Element {
         <span className="text-xs text-orange-300 font-mono">{user.address.slice(0, 6)}...{user.address.slice(-4)}</span>
       </div>
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-        <Button onClick={logout} variant="outline" className="ml-2 border-orange-400/50 text-orange-200 hover:bg-orange-500/20">
+        <Button onClick={handleSignOutClick} variant="outline" className="ml-2 border-orange-400/50 text-orange-200 hover:bg-orange-500/20">
           Sign Out
         </Button>
       </motion.div>
