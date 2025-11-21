@@ -531,9 +531,11 @@ export function AdminPanel(): JSX.Element {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-gray-300 text-sm font-bold">🔢 Round Number <span className="text-gray-500 font-normal text-xs">(sequential: 1, 2, 3...)</span></Label>
+                  <Label htmlFor="roundNumber" className="text-gray-300 text-sm font-bold">🔢 Round Number <span className="text-gray-500 font-normal text-xs">(sequential: 1, 2, 3...)</span></Label>
                   <Input
                     type="number"
+                    id="roundNumber"
+                    name="roundNumber"
                     placeholder="Enter: 1, 2, 3, 4, 5... (NOT block number!)"
                     value={roundNumber}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRoundNumber(e.target.value)}
@@ -543,9 +545,11 @@ export function AdminPanel(): JSX.Element {
                   <p className="text-[10px] text-green-400">✅ Example: Round 1, Round 2, Round 3</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-gray-300 text-sm font-bold">🧱 Target Block Number <span className="text-gray-500 font-normal text-xs">(from mempool.space)</span></Label>
+                  <Label htmlFor="blockNumber" className="text-gray-300 text-sm font-bold">🧱 Target Block Number <span className="text-gray-500 font-normal text-xs">(from mempool.space)</span></Label>
                   <Input
                     type="number"
+                    id="blockNumber"
+                    name="blockNumber"
                     placeholder="Enter: 919185, 875420... (Bitcoin block height)"
                     value={blockNumber}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBlockNumber(e.target.value)}
@@ -555,9 +559,11 @@ export function AdminPanel(): JSX.Element {
                   <p className="text-[10px] text-cyan-400">✅ Example: Block #919185 (6-digit number)</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-gray-300 text-sm font-bold">⏱ Round Duration <span className="text-gray-500 font-normal text-xs">(in minutes)</span></Label>
+                  <Label htmlFor="duration" className="text-gray-300 text-sm font-bold">⏱ Round Duration <span className="text-gray-500 font-normal text-xs">(in minutes)</span></Label>
                   <Input
                     type="number"
+                    id="duration"
+                    name="duration"
                     placeholder="e.g., 10, 15, 30 minutes"
                     value={duration}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDuration(e.target.value)}
@@ -696,9 +702,11 @@ export function AdminPanel(): JSX.Element {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-gray-300 text-sm">Jackpot Amount</Label>
+                    <Label htmlFor="jackpotAmount" className="text-gray-300 text-sm">Jackpot Amount</Label>
                     <Input
                       type="text"
+                      id="jackpotAmount"
+                      name="jackpotAmount"
                       placeholder="5000 (enter numbers only)"
                       value={jackpotAmount}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJackpotAmount(e.target.value)}
@@ -710,9 +718,11 @@ export function AdminPanel(): JSX.Element {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-gray-300 text-sm">1st Place Prize</Label>
+                    <Label htmlFor="firstPrize" className="text-gray-300 text-sm">1st Place Prize</Label>
                     <Input
                       type="text"
+                      id="firstPrize"
+                      name="firstPrize"
                       placeholder="1000"
                       value={firstPrize}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFirstPrize(e.target.value)}
@@ -720,9 +730,11 @@ export function AdminPanel(): JSX.Element {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-gray-300 text-sm">2nd Place Prize</Label>
+                    <Label htmlFor="secondPrize" className="text-gray-300 text-sm">2nd Place Prize</Label>
                     <Input
                       type="text"
+                      id="secondPrize"
+                      name="secondPrize"
                       placeholder="500"
                       value={secondPrize}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSecondPrize(e.target.value)}
@@ -733,9 +745,11 @@ export function AdminPanel(): JSX.Element {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-gray-300 text-sm">Prize Currency</Label>
+                <Label htmlFor="prizeCurrency" className="text-gray-300 text-sm">Prize Currency</Label>
                 <Input
                   type="text"
+                  id="prizeCurrency"
+                  name="prizeCurrency"
                   placeholder="$Seconds"
                   value={prizeCurrency}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency('$Seconds')}
