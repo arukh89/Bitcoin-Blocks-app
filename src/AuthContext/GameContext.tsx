@@ -136,6 +136,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   const [checkInRecords, setCheckInRecords] = useState<CheckInRecord[]>([])
   const [hasCheckedInToday, setHasCheckedInToday] = useState<boolean>(false)
   const [weeklyCheckInLeaderboard, setWeeklyCheckInLeaderboard] = useState<WeeklyLeaderboardEntry[]>([])
+  const [initSnapshotDone, setInitSnapshotDone] = useState<boolean>(false)
 
   const activeRound = rounds.find(r => r.status === 'open') || null
 
@@ -174,6 +175,20 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       mounted = false
     }
   }, [])
+
+  // Force an initial snapshot to ensure caches are populated (FullUpdate)
+  useEffect(() => {
+    if (!client || !connected) return
+    if (initSnapshotDone) return
+    try {
+      console.log('🚀 [REALTIME] Forcing initial snapshot (getActiveRound, getPrizeConfig)')
+      client.reducers.getActiveRound()
+      client.reducers.getPrizeConfig()
+      setInitSnapshotDone(true)
+    } catch (e) {
+      console.warn('⚠️ [REALTIME] Initial snapshot trigger failed:', e)
+    }
+  }, [client, connected, initSnapshotDone])
 
   // ===========================================
   // Subscribe to rounds table
