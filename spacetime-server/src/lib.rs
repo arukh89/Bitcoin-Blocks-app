@@ -271,7 +271,7 @@ pub fn save_prize_config(
         ctx.db.prize_config().delete(existing);
     }
 
-    // Enforce canonical currency and remove contract address usage per product decision
+    // Enforce canonical currency per product decision
     let enforced_currency = "$Seconds".to_string();
     let enforced_contract = "".to_string();
 

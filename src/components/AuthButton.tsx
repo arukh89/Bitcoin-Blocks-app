@@ -9,7 +9,7 @@ import type { User } from '@/types/game'
 import { sdk } from '@farcaster/miniapp-sdk'
 
 export function AuthButton(): JSX.Element {
-  const { user, signInWithWallet } = useAuth()
+  const { user, signInWithWallet, logout } = useAuth()
   const [loading, setLoading] = useState<boolean>(false)
   const [isHovered, setIsHovered] = useState<boolean>(false)
 
@@ -97,6 +97,11 @@ export function AuthButton(): JSX.Element {
         <span className="text-sm font-bold text-white">@{user.username}</span>
         <span className="text-xs text-orange-300 font-mono">{user.address.slice(0, 6)}...{user.address.slice(-4)}</span>
       </div>
+      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+        <Button onClick={logout} variant="outline" className="ml-2 border-orange-400/50 text-orange-200 hover:bg-orange-500/20">
+          Sign Out
+        </Button>
+      </motion.div>
     </motion.div>
   )
 }

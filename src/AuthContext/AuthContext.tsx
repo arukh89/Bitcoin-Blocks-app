@@ -37,6 +37,7 @@ interface AuthContextType {
   signInWithNeynar: () => Promise<void>
   signInWithWallet: (address: string) => Promise<void>
   signOut: () => void
+  logout: () => void
   walletAddress: string | null
   walletChain: 'base' | 'arbitrum' | null
   setWalletChain: (chain: 'base' | 'arbitrum') => void
@@ -157,6 +158,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     console.log('👋 User signed out')
   }, [])
 
+  const logout = useCallback((): void => {
+    signOut()
+  }, [signOut])
+
   const value: AuthContextType = {
     user,
     userFid,
@@ -166,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     signInWithNeynar,
     signInWithWallet,
     signOut,
+    logout,
     walletAddress,
     walletChain,
     setWalletChain
