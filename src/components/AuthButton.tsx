@@ -6,7 +6,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/context/AuthContext'
 import { motion } from 'framer-motion'
 import type { User } from '@/types/game'
-import { sdk } from '@farcaster/miniapp-sdk'
+import sdk from '@farcaster/miniapp-sdk'
 
 export function AuthButton(): JSX.Element {
   const { user, signInWithWallet, logout } = useAuth()
