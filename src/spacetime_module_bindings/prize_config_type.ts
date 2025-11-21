@@ -34,7 +34,6 @@ export type PrizeConfig = {
   firstPlaceAmount: bigint,
   secondPlaceAmount: bigint,
   currencyType: string,
-  tokenContractAddress: string,
   updatedAt: bigint,
 };
 let _cached_PrizeConfig_type_value: __AlgebraicTypeType | null = null;
@@ -56,7 +55,6 @@ export const PrizeConfig = {
       { name: "firstPlaceAmount", algebraicType: __AlgebraicTypeValue.I64 },
       { name: "secondPlaceAmount", algebraicType: __AlgebraicTypeValue.I64 },
       { name: "currencyType", algebraicType: __AlgebraicTypeValue.String },
-      { name: "tokenContractAddress", algebraicType: __AlgebraicTypeValue.String },
       { name: "updatedAt", algebraicType: __AlgebraicTypeValue.I64 },
     );
     return _cached_PrizeConfig_type_value;

@@ -119,7 +119,6 @@ function convertPrizeConfig(p: STDBPrizeConfig): PrizeConfiguration {
     firstPlaceAmount: String(p.firstPlaceAmount),
     secondPlaceAmount: String(p.secondPlaceAmount),
     currencyType: p.currencyType,
-    tokenContractAddress: p.tokenContractAddress,
     updatedAt: toMillis(p.updatedAt)
   }
 }

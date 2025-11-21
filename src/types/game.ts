@@ -69,6 +69,5 @@ export interface PrizeConfiguration {
   firstPlaceAmount: string;
   secondPlaceAmount: string;
   currencyType: string;
-  tokenContractAddress: string;
   updatedAt: number;
 }

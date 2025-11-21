@@ -398,8 +398,7 @@ export function AdminPanel(): JSX.Element {
         BigInt(Math.floor(jackpotNum)),
         BigInt(Math.floor(firstNum)),
         BigInt(Math.floor(secondNum)),
-        prizeCurrency.trim(),
-        '' // tokenContractAddress - empty for now
+        prizeCurrency.trim()
       )
 
       toast({
