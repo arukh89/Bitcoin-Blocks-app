@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
 import { useAuth } from '@/context/AuthContext'
-import { sdk } from "@farcaster/miniapp-sdk"
+import sdk from "@farcaster/miniapp-sdk"
 import { useAddMiniApp } from "@/hooks/useAddMiniApp";
 import { useQuickAuth } from "@/hooks/useQuickAuth";
 import { useIsInFarcaster } from "@/hooks/useIsInFarcaster";
