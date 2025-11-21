@@ -134,9 +134,11 @@ export function GuessForm(): JSX.Element {
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-gray-300 text-sm font-semibold">🎯 Your Prediction</Label>
+            <Label htmlFor="guess" className="text-gray-300 text-sm font-semibold">🎯 Your Prediction</Label>
             <Input
               type="number"
+              id="guess"
+              name="guess"
               placeholder={!user ? "Sign in to predict..." : !activeRound ? "Waiting for round..." : "Enter tx count (1-20,000)"}
               value={guess}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuess(e.target.value)}
