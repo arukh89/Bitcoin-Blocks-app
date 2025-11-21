@@ -41,9 +41,6 @@ interface AuthContextType {
   walletAddress: string | null
   walletChain: 'base' | 'arbitrum' | null
   setWalletChain: (chain: 'base' | 'arbitrum') => void
-  // Attempts to hydrate auth state from Farcaster mini app context.
-  // Returns true if a Farcaster user was found and set.
-  hydrateFromFarcaster: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -59,40 +56,48 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   // ===========================================
   // FARCASTER SDK AUTO-LOGIN (Mini App Context)
   // ===========================================
-  const hydrateFromFarcaster = useCallback(async (): Promise<boolean> => {
-    try {
-      await sdk.actions.ready()
-      const context = await sdk.context
-      // Mark that we are running inside Farcaster mini app (context resolved)
-      setIsInFarcaster(true)
-      if (context?.user) {
-        const fid = context.user.fid
-        const isAdmin = isAdminFid(fid)
-        const farcasterUser: User = {
-          address: `fid-${fid}`,
-          username: context.user.username || `user${fid}`,
-          displayName: context.user.displayName || context.user.username || 'Anonymous',
-          pfpUrl: context.user.pfpUrl || 'https://i.imgur.com/placeholder.jpg',
-          isAdmin
-        }
-        setUser(farcasterUser)
-        setUserFid(fid)
-        setAuthMode('farcaster-sdk')
-        console.log('✅ Hydrated user from Farcaster context:', { fid, isAdmin })
-        return true
-      }
-      return false
-    } catch (error) {
-      // Do not force isInFarcaster=false here; allow retries from hooks/page once SDK becomes ready
-      console.log('ℹ️ Farcaster SDK not ready yet or not in mini app:', error)
-      return false
-    }
-  }, [])
-
   useEffect(() => {
-    // Initial attempt on mount; additional retries are handled by useQuickAuth
-    void hydrateFromFarcaster()
-  }, [hydrateFromFarcaster])
+    const initFarcaster = async (): Promise<void> => {
+      try {
+        console.log('🟣 Initializing Farcaster SDK...')
+        await sdk.actions.ready()
+        const context = await sdk.context
+        console.log('✅ Farcaster SDK ready:', context)
+        
+        setIsInFarcaster(true)
+        
+        // Auto-login with Farcaster user data
+        if (context.user) {
+          const fid = context.user.fid
+          const isAdmin = isAdminFid(fid)
+          
+          console.log('👤 Auto-login with Farcaster user:', {
+            fid,
+            username: context.user.username,
+            isAdmin
+          })
+          
+          const farcasterUser: User = {
+            address: `fid-${fid}`,
+            username: context.user.username || `user${fid}`,
+            displayName: context.user.displayName || context.user.username || 'Anonymous',
+            pfpUrl: context.user.pfpUrl || 'https://i.imgur.com/placeholder.jpg',
+            isAdmin
+          }
+          
+          setUser(farcasterUser)
+          setUserFid(fid)
+          setAuthMode('farcaster-sdk')
+          console.log('✅ Farcaster SDK auto-login successful')
+        }
+      } catch (error) {
+        console.log('ℹ️ Not in Farcaster context (web mode)')
+        setIsInFarcaster(false)
+      }
+    }
+
+    initFarcaster()
+  }, [])
 
   // ===========================================
   // NEYNAR SIGN IN (Web Context)
@@ -169,8 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     logout,
     walletAddress,
     walletChain,
-    setWalletChain,
-    hydrateFromFarcaster
+    setWalletChain
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

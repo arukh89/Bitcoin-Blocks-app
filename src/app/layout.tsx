@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 import { Inter } from 'next/font/google'
-import NextDynamic from 'next/dynamic'
 import './globals.css'
-const Providers = NextDynamic(() => import('@/app/providers').then(m => m.Providers), { ssr: false })
+import { Providers } from '@/app/providers'
 import FarcasterWrapper from '@/components/FarcasterWrapper'
 import { Toaster } from '@/components/ui/sonner'
 
