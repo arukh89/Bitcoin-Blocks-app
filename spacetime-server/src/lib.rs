@@ -95,7 +95,6 @@ pub struct PrizeConfig {
     pub first_place_amount: i64,
     pub second_place_amount: i64,
     pub currency_type: String,
-    pub token_contract_address: String,
     pub updated_at: i64,
 }
 
@@ -263,7 +262,6 @@ pub fn save_prize_config(
     first_place_amount: i64,
     second_place_amount: i64,
     currency_type: String,
-    token_contract_address: String,
 ) {
     let updated_at = now_secs(ctx);
     // Upsert row with id = 1: delete any existing then insert fresh
@@ -271,13 +269,15 @@ pub fn save_prize_config(
         ctx.db.prize_config().delete(existing);
     }
 
+    // Enforce canonical currency per product decision
+    let enforced_currency = "$Seconds".to_string();
+
     let row = PrizeConfig {
         config_id: 1,
         jackpot_amount,
         first_place_amount,
         second_place_amount,
-        currency_type,
-        token_contract_address,
+        currency_type: enforced_currency,
         updated_at,
     };
     ctx.db.prize_config().insert(row);

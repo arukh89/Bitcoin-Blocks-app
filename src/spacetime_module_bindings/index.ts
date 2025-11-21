@@ -321,19 +321,19 @@ export class RemoteReducers {
     this.connection.offReducer("get_prize_config", callback);
   }
 
-  savePrizeConfig(jackpotAmount: bigint, firstPlaceAmount: bigint, secondPlaceAmount: bigint, currencyType: string, tokenContractAddress: string) {
-    const __args = { jackpotAmount, firstPlaceAmount, secondPlaceAmount, currencyType, tokenContractAddress };
+  savePrizeConfig(jackpotAmount: bigint, firstPlaceAmount: bigint, secondPlaceAmount: bigint, currencyType: string) {
+    const __args = { jackpotAmount, firstPlaceAmount, secondPlaceAmount, currencyType };
     let __writer = new __BinaryWriter(1024);
     SavePrizeConfig.serialize(__writer, __args);
     let __argsBuffer = __writer.getBuffer();
     this.connection.callReducer("save_prize_config", __argsBuffer, this.setCallReducerFlags.savePrizeConfigFlags);
   }
 
-  onSavePrizeConfig(callback: (ctx: ReducerEventContext, jackpotAmount: bigint, firstPlaceAmount: bigint, secondPlaceAmount: bigint, currencyType: string, tokenContractAddress: string) => void) {
+  onSavePrizeConfig(callback: (ctx: ReducerEventContext, jackpotAmount: bigint, firstPlaceAmount: bigint, secondPlaceAmount: bigint, currencyType: string) => void) {
     this.connection.onReducer("save_prize_config", callback);
   }
 
-  removeOnSavePrizeConfig(callback: (ctx: ReducerEventContext, jackpotAmount: bigint, firstPlaceAmount: bigint, secondPlaceAmount: bigint, currencyType: string, tokenContractAddress: string) => void) {
+  removeOnSavePrizeConfig(callback: (ctx: ReducerEventContext, jackpotAmount: bigint, firstPlaceAmount: bigint, secondPlaceAmount: bigint, currencyType: string) => void) {
     this.connection.offReducer("save_prize_config", callback);
   }
 

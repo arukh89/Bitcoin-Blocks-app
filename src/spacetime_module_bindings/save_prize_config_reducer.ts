@@ -33,7 +33,6 @@ export type SavePrizeConfig = {
   firstPlaceAmount: bigint,
   secondPlaceAmount: bigint,
   currencyType: string,
-  tokenContractAddress: string,
 };
 let _cached_SavePrizeConfig_type_value: __AlgebraicTypeType | null = null;
 
@@ -53,7 +52,6 @@ export const SavePrizeConfig = {
       { name: "firstPlaceAmount", algebraicType: __AlgebraicTypeValue.I64 },
       { name: "secondPlaceAmount", algebraicType: __AlgebraicTypeValue.I64 },
       { name: "currencyType", algebraicType: __AlgebraicTypeValue.String },
-      { name: "tokenContractAddress", algebraicType: __AlgebraicTypeValue.String },
     );
     return _cached_SavePrizeConfig_type_value;
   },

@@ -13,6 +13,7 @@ import type { ChatMessage } from '@/types/game'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft, Loader2 } from 'lucide-react'
+import { CheckInLeaderboard } from '@/components/CheckInLeaderboard'
 // Removed APP_CONFIG - using pure realtime mode
 
 export default function AdminPage(): JSX.Element {
@@ -25,10 +26,10 @@ export default function AdminPage(): JSX.Element {
   // Form states
   const [blockNumber, setBlockNumber] = useState<string>('')
   const [jackpotAmount, setJackpotAmount] = useState<string>('5,000')
-  const [jackpotCurrency, setJackpotCurrency] = useState<string>('$SECOND')
+  const [jackpotCurrency, setJackpotCurrency] = useState<string>('$Seconds')
   const [firstPrize, setFirstPrize] = useState<string>('1,000')
   const [secondPrize, setSecondPrize] = useState<string>('500')
-  const [prizeCurrency, setPrizeCurrency] = useState<string>('$SECOND')
+  const [prizeCurrency, setPrizeCurrency] = useState<string>('$Seconds')
 
   // Redirect if not admin
   useEffect(() => {
@@ -522,9 +523,10 @@ export default function AdminPage(): JSX.Element {
                   <Label className="text-gray-300 text-sm">Jackpot Currency</Label>
                   <Input
                     type="text"
-                    placeholder="$SECOND"
+                    placeholder="$Seconds"
                     value={jackpotCurrency}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJackpotCurrency(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJackpotCurrency('$Seconds')}
+                    disabled
                     className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-500"
                   />
                 </div>
@@ -557,9 +559,10 @@ export default function AdminPage(): JSX.Element {
                 <Label className="text-gray-300 text-sm">Prize Currency</Label>
                 <Input
                   type="text"
-                  placeholder="$SECOND, BTC, ETH, SATS"
+                  placeholder="$Seconds"
                   value={prizeCurrency}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency('$Seconds')}
+                  disabled
                   className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-500"
                 />
               </div>
@@ -571,6 +574,15 @@ export default function AdminPage(): JSX.Element {
               </div>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Weekly Check-In Leaderboard */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.65 }}
+        >
+          <CheckInLeaderboard />
         </motion.div>
 
         {/* Info Notes */}
