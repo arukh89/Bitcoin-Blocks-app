@@ -6,7 +6,7 @@ import { DbConnection, type RemoteTables, type RemoteReducers } from '@/spacetim
 // Using Maincloud (production-ready database)
 // Instructions: See DEPLOYMENT_GUIDE.md
 const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || 'wss://maincloud.spacetimedb.com'
-const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || 'bitcoin-blocks-app'
+const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || 'bitcoin-blocks-app-v2'
 
 let dbConnection: DbConnection | null = null
 let isConnecting = false
