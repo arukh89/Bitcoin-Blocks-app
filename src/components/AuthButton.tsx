@@ -10,7 +10,7 @@ import sdk from '@farcaster/miniapp-sdk'
 import { useDisconnect } from 'wagmi'
 
 export function AuthButton(): JSX.Element {
-  const { user, isInFarcaster, signInWithWallet, logout } = useAuth()
+  const { user, signInWithWallet, logout } = useAuth()
   const { disconnect } = useDisconnect()
   const [loading, setLoading] = useState<boolean>(false)
   const [isHovered, setIsHovered] = useState<boolean>(false)
@@ -61,13 +61,6 @@ export function AuthButton(): JSX.Element {
   }
 
   if (!user) {
-    if (isInFarcaster) {
-      return (
-        <Button disabled className="animate-pulse">
-          Signing in with Farcaster...
-        </Button>
-      )
-    }
     return (
       <motion.div
         whileHover={{ scale: 1.05 }}
