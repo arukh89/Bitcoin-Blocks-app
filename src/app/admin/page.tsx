@@ -160,43 +160,24 @@ export default function AdminPage(): JSX.Element {
     try {
       setLoading(true)
       
-      // Fetch from mempool.space
-        const blockRes = await fetch('/api/proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            protocol: 'https',
-            origin: 'mempool.space',
-            path: `/api/block-height/${activeRound.blockNumber}`,
-            method: 'GET',
-            headers: {}
-          })
-        })
+      // Fetch from internal mempool API
+      const recentRes = await fetch('/api/mempool?action=recent-blocks')
+      if (!recentRes.ok) {
+        throw new Error('Failed to fetch recent blocks')
+      }
+      const recentBlocks = await recentRes.json() as Array<{ height: number, hash: string }>
+      const found = recentBlocks.find(b => b.height === activeRound.blockNumber)
+      if (!found) {
+        throw new Error(`Block #${activeRound.blockNumber} not found in recent blocks. Try again later.`)
+      }
+      const blockHash = found.hash
 
-        if (!blockRes.ok) {
-          throw new Error(`Block #${activeRound.blockNumber} not found yet. Try again later.`)
-        }
-
-        const blockHash = await blockRes.text() as string
-
-        const txRes = await fetch('/api/proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            protocol: 'https',
-            origin: 'mempool.space',
-            path: `/api/block/${blockHash}/txids`,
-            method: 'GET',
-            headers: {}
-          })
-        })
-
-        if (!txRes.ok) {
-          throw new Error('Failed to fetch transactions from mempool.space')
-        }
-
-        const txids = await txRes.json() as string[]
-        const actualTxCount = txids.length
+      const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
+      if (!txRes.ok) {
+        throw new Error('Failed to fetch transaction count')
+      }
+      const { txCount } = await txRes.json() as { txCount: number }
+      const actualTxCount = txCount
 
         // Find winners
         const guesses = getGuessesForRound(activeRound.id)

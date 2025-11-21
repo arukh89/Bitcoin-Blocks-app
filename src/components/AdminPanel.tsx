@@ -236,43 +236,25 @@ export function AdminPanel(): JSX.Element {
     try {
       setLoading(true)
       
-      // Fetch from mempool.space
-      const blockRes = await fetch('/api/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          protocol: 'https',
-          origin: 'mempool.space',
-          path: `/api/block-height/${closedRound.blockNumber}`,
-          method: 'GET',
-          headers: {}
-        })
-      })
-
-      if (!blockRes.ok) {
-        throw new Error(`Block #${closedRound.blockNumber} not found yet. Try again later.`)
+      // Fetch from internal mempool API
+      // 1) Try recent blocks then locate by height
+      const recentRes = await fetch('/api/mempool?action=recent-blocks')
+      if (!recentRes.ok) {
+        throw new Error('Failed to fetch recent blocks')
       }
+      const recentBlocks = await recentRes.json() as Array<{ height: number, hash: string }>
+      const found = recentBlocks.find(b => b.height === closedRound.blockNumber)
+      if (!found) {
+        throw new Error(`Block #${closedRound.blockNumber} not found in recent blocks. Try again later.`)
+      }
+      const blockHash = found.hash
 
-      const blockHash = await blockRes.text() as string
-
-      const txRes = await fetch('/api/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          protocol: 'https',
-          origin: 'mempool.space',
-          path: `/api/block/${blockHash}/txids`,
-          method: 'GET',
-          headers: {}
-        })
-      })
-
+      const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
       if (!txRes.ok) {
-        throw new Error('Failed to fetch transactions from mempool.space')
+        throw new Error('Failed to fetch transaction count')
       }
-
-      const txids = await txRes.json() as string[]
-      const actualTxCount = txids.length
+      const { txCount } = await txRes.json() as { txCount: number }
+      const actualTxCount = txCount
 
       // Find winners
       const guesses = getGuessesForRound(closedRound.id)
@@ -416,27 +398,19 @@ export function AdminPanel(): JSX.Element {
     }
   }
 
-  // Poll mempool.space to check if target block is available
+  // Poll mempool (via internal API) to check if target block is available
   const pollForTargetBlock = async (targetBlock: number): Promise<void> => {
     setCheckingBlock(true)
     setBlockAvailable(false)
     
     const checkBlock = async (): Promise<boolean> => {
       try {
-        const response = await fetch('/api/proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            protocol: 'https',
-            origin: 'mempool.space',
-            path: `/api/block-height/${targetBlock}`,
-            method: 'GET',
-            headers: {}
-          })
-        })
-        
-        if (response.ok) {
-          console.log(`✅ Block #${targetBlock} is now available on mempool.space!`)
+        const response = await fetch('/api/mempool?action=recent-blocks')
+        if (!response.ok) return false
+        const blocks = await response.json() as Array<{ height: number }>
+        const exists = blocks.some(b => b.height === targetBlock)
+        if (exists) {
+          console.log(`✅ Block #${targetBlock} is now available (recent-blocks)!`)
           return true
         }
         return false
