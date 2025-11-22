@@ -3,17 +3,15 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 
-import { AuthButton } from '@/components/AuthButton'
+import { SignInButton } from '@/components/SignInButton'
 import { GlobalChat } from '@/components/GlobalChat'
 import { AdminPanel } from '@/components/AdminPanel'
-import { Countdown } from '@/components/Countdown'
 import { GuessForm } from '@/components/GuessForm'
 import { Leaderboard } from '@/components/Leaderboard'
 import { AllPredictions } from '@/components/AllPredictions'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { AnimatedBackground } from '@/components/AnimatedBackground'
 import { RecentBlocks } from '@/components/RecentBlocks'
-import { DatabaseStatusBanner } from '@/components/DatabaseStatusBanner'
 import { CurrentRound } from '@/components/CurrentRound'
 import PrizesAndRulesSection from '@/components/PrizesAndRulesSection'
 import { DailyCheckIn } from '@/components/DailyCheckIn'
@@ -92,6 +90,9 @@ export default function Home(): JSX.Element {
   }, [])
 
   const participantCount = activeRound ? getGuessesForRound(activeRound.id).length : 0
+  const jackpotText = prizeConfig
+    ? `${Number(prizeConfig.jackpotAmount).toLocaleString()} ${prizeConfig.currencyType}`
+    : `${(Number(getSetting('jackpot_default', '5000')) || 5000).toLocaleString()} ${getSetting('default_currency', '$Seconds')}`
 
   return (
     <>
@@ -176,7 +177,7 @@ export default function Home(): JSX.Element {
                     {connected ? 'Connected' : 'Disconnected'}
                   </Badge>
                 </motion.div>
-                <AuthButton />
+                <SignInButton />
               </div>
             </motion.div>
 
@@ -205,7 +206,7 @@ export default function Home(): JSX.Element {
                     }}
                     transition={{ duration: 2, repeat: Infinity }}
                   >
-                    {prizeConfig ? `${Number(prizeConfig.jackpotAmount).toLocaleString()} ${prizeConfig.currencyType}` : '5,000 $Seconds'}
+                    {jackpotText}
                   </motion.p>
                 </CardContent>
               </Card>
@@ -213,9 +214,9 @@ export default function Home(): JSX.Element {
 
             {/* Prizes and Rules Section - Combined */}
             <PrizesAndRulesSection 
-              firstPrize={prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : '1,000'}
-              secondPrize={prizeConfig ? Number(prizeConfig.secondPlaceAmount).toLocaleString() : '500'}
-              currency={prizeConfig?.currencyType || '$Seconds'}
+              firstPrize={prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : 'N/A'}
+              secondPrize={prizeConfig ? Number(prizeConfig.secondPlaceAmount).toLocaleString() : 'N/A'}
+              currency={prizeConfig?.currencyType || getSetting('default_currency', '$Seconds') || '$Seconds'}
             />
 
             {/* Current Round - New Simplified Design */}

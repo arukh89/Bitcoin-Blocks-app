@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/app/providers'
-import FarcasterWrapper from '@/components/FarcasterWrapper'
 import { Toaster } from '@/components/ui/sonner'
 
 const inter = Inter({
@@ -20,9 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} antialiased font-sans`}>
         <Providers>
-          <FarcasterWrapper>
-            {children}
-          </FarcasterWrapper>
+          {children}
           <Toaster richColors position="top-center" />
         </Providers>
       </body>

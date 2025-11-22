@@ -10,9 +10,9 @@ interface PrizesAndRulesSectionProps {
 }
 
 export default function PrizesAndRulesSection({
-  firstPrize = '1,000',
-  secondPrize = '500',
-  currency = '$Seconds'
+  firstPrize = '—',
+  secondPrize = '—',
+  currency = '—'
 }: PrizesAndRulesSectionProps): React.ReactElement {
   return (
     <motion.div
