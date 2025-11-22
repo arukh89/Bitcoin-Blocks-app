@@ -35,6 +35,8 @@ import { CreateRound } from "./create_round_reducer.ts";
 export { CreateRound };
 import { DailyCheckin } from "./daily_checkin_reducer.ts";
 export { DailyCheckin };
+import { DeleteSetting } from "./delete_setting_reducer.ts";
+export { DeleteSetting };
 import { EndRoundManually } from "./end_round_manually_reducer.ts";
 export { EndRoundManually };
 import { GetActiveRound } from "./get_active_round_reducer.ts";
@@ -43,6 +45,8 @@ import { GetPrizeConfig } from "./get_prize_config_reducer.ts";
 export { GetPrizeConfig };
 import { SavePrizeConfig } from "./save_prize_config_reducer.ts";
 export { SavePrizeConfig };
+import { SaveSetting } from "./save_setting_reducer.ts";
+export { SaveSetting };
 import { SendChatMessage } from "./send_chat_message_reducer.ts";
 export { SendChatMessage };
 import { SubmitGuess } from "./submit_guess_reducer.ts";
@@ -67,6 +71,8 @@ import { RoundTimerTableHandle } from "./round_timer_table.ts";
 export { RoundTimerTableHandle };
 import { RoundsTableHandle } from "./rounds_table.ts";
 export { RoundsTableHandle };
+import { SettingsTableHandle } from "./settings_table.ts";
+export { SettingsTableHandle };
 import { UserStatsTableHandle } from "./user_stats_table.ts";
 export { UserStatsTableHandle };
 
@@ -85,6 +91,8 @@ import { Round } from "./round_type.ts";
 export { Round };
 import { RoundTimer } from "./round_timer_type.ts";
 export { RoundTimer };
+import { Setting } from "./setting_type.ts";
+export { Setting };
 import { UserStat } from "./user_stat_type.ts";
 export { UserStat };
 
@@ -153,6 +161,15 @@ const REMOTE_MODULE = {
         colType: (Round.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
       },
     },
+    settings: {
+      tableName: "settings" as const,
+      rowType: Setting.getTypeScriptAlgebraicType(),
+      primaryKey: "key",
+      primaryKeyInfo: {
+        colName: "key",
+        colType: (Setting.getTypeScriptAlgebraicType() as __AlgebraicTypeVariants.Product).value.elements[0].algebraicType,
+      },
+    },
     user_stats: {
       tableName: "user_stats" as const,
       rowType: UserStat.getTypeScriptAlgebraicType(),
@@ -172,6 +189,10 @@ const REMOTE_MODULE = {
       reducerName: "daily_checkin",
       argsType: DailyCheckin.getTypeScriptAlgebraicType(),
     },
+    delete_setting: {
+      reducerName: "delete_setting",
+      argsType: DeleteSetting.getTypeScriptAlgebraicType(),
+    },
     end_round_manually: {
       reducerName: "end_round_manually",
       argsType: EndRoundManually.getTypeScriptAlgebraicType(),
@@ -187,6 +208,10 @@ const REMOTE_MODULE = {
     save_prize_config: {
       reducerName: "save_prize_config",
       argsType: SavePrizeConfig.getTypeScriptAlgebraicType(),
+    },
+    save_setting: {
+      reducerName: "save_setting",
+      argsType: SaveSetting.getTypeScriptAlgebraicType(),
     },
     send_chat_message: {
       reducerName: "send_chat_message",
@@ -236,10 +261,12 @@ const REMOTE_MODULE = {
 export type Reducer = never
 | { name: "CreateRound", args: CreateRound }
 | { name: "DailyCheckin", args: DailyCheckin }
+| { name: "DeleteSetting", args: DeleteSetting }
 | { name: "EndRoundManually", args: EndRoundManually }
 | { name: "GetActiveRound", args: GetActiveRound }
 | { name: "GetPrizeConfig", args: GetPrizeConfig }
 | { name: "SavePrizeConfig", args: SavePrizeConfig }
+| { name: "SaveSetting", args: SaveSetting }
 | { name: "SendChatMessage", args: SendChatMessage }
 | { name: "SubmitGuess", args: SubmitGuess }
 | { name: "TickRounds", args: TickRounds }
@@ -279,6 +306,22 @@ export class RemoteReducers {
 
   removeOnDailyCheckin(callback: (ctx: ReducerEventContext, userIdentifier: string, username: string, pfpUrl: string) => void) {
     this.connection.offReducer("daily_checkin", callback);
+  }
+
+  deleteSetting(key: string) {
+    const __args = { key };
+    let __writer = new __BinaryWriter(1024);
+    DeleteSetting.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("delete_setting", __argsBuffer, this.setCallReducerFlags.deleteSettingFlags);
+  }
+
+  onDeleteSetting(callback: (ctx: ReducerEventContext, key: string) => void) {
+    this.connection.onReducer("delete_setting", callback);
+  }
+
+  removeOnDeleteSetting(callback: (ctx: ReducerEventContext, key: string) => void) {
+    this.connection.offReducer("delete_setting", callback);
   }
 
   endRoundManually(roundId: bigint) {
@@ -335,6 +378,22 @@ export class RemoteReducers {
 
   removeOnSavePrizeConfig(callback: (ctx: ReducerEventContext, jackpotAmount: bigint, firstPlaceAmount: bigint, secondPlaceAmount: bigint, currencyType: string) => void) {
     this.connection.offReducer("save_prize_config", callback);
+  }
+
+  saveSetting(key: string, value: string) {
+    const __args = { key, value };
+    let __writer = new __BinaryWriter(1024);
+    SaveSetting.serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("save_setting", __argsBuffer, this.setCallReducerFlags.saveSettingFlags);
+  }
+
+  onSaveSetting(callback: (ctx: ReducerEventContext, key: string, value: string) => void) {
+    this.connection.onReducer("save_setting", callback);
+  }
+
+  removeOnSaveSetting(callback: (ctx: ReducerEventContext, key: string, value: string) => void) {
+    this.connection.offReducer("save_setting", callback);
   }
 
   sendChatMessage(roundId: string, address: string, username: string, message: string, pfpUrl: string, msgType: string) {
@@ -414,6 +473,11 @@ export class SetReducerFlags {
     this.dailyCheckinFlags = flags;
   }
 
+  deleteSettingFlags: __CallReducerFlags = 'FullUpdate';
+  deleteSetting(flags: __CallReducerFlags) {
+    this.deleteSettingFlags = flags;
+  }
+
   endRoundManuallyFlags: __CallReducerFlags = 'FullUpdate';
   endRoundManually(flags: __CallReducerFlags) {
     this.endRoundManuallyFlags = flags;
@@ -432,6 +496,11 @@ export class SetReducerFlags {
   savePrizeConfigFlags: __CallReducerFlags = 'FullUpdate';
   savePrizeConfig(flags: __CallReducerFlags) {
     this.savePrizeConfigFlags = flags;
+  }
+
+  saveSettingFlags: __CallReducerFlags = 'FullUpdate';
+  saveSetting(flags: __CallReducerFlags) {
+    this.saveSettingFlags = flags;
   }
 
   sendChatMessageFlags: __CallReducerFlags = 'FullUpdate';
@@ -492,6 +561,11 @@ export class RemoteTables {
   get rounds(): RoundsTableHandle<'rounds'> {
     // clientCache is a private property
     return new RoundsTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<Round>(REMOTE_MODULE.tables.rounds));
+  }
+
+  get settings(): SettingsTableHandle<'settings'> {
+    // clientCache is a private property
+    return new SettingsTableHandle((this.connection as unknown as { clientCache: __ClientCache }).clientCache.getOrCreateTable<Setting>(REMOTE_MODULE.tables.settings));
   }
 
   get userStats(): UserStatsTableHandle<'user_stats'> {
