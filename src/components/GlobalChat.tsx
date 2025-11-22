@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { ChatMessage } from '@/types/game'
 
 export function GlobalChat(): JSX.Element {
-  const { activeRound, chatMessages, addChatMessage } = useGame()
+  const { activeRound, chatMessages, addChatMessage, connected } = useGame()
   const { user } = useAuth()
   const { toast } = useToast()
   const [message, setMessage] = useState<string>('')
@@ -60,6 +60,10 @@ export function GlobalChat(): JSX.Element {
               e.preventDefault()
               
               if (!message.trim()) return
+              if (!connected) {
+                toast({ title: 'Not connected', description: 'Please wait for DB connection', variant: 'destructive' })
+                return
+              }
               
               if (message.length > 200) {
                 toast({
@@ -82,7 +86,7 @@ export function GlobalChat(): JSX.Element {
                   timestamp: Date.now(),
                   type: 'chat'
                 }
-                addChatMessage(chatMsg)
+                await addChatMessage(chatMsg)
                 setMessage('')
                 toast({
                   title: '✅ Message Sent',
@@ -91,7 +95,7 @@ export function GlobalChat(): JSX.Element {
               } catch (error) {
                 toast({
                   title: '❌ Send Failed',
-                  description: 'Could not send message',
+                  description: String(error),
                   variant: 'destructive'
                 })
               } finally {
@@ -103,13 +107,13 @@ export function GlobalChat(): JSX.Element {
                 placeholder="Type a message..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                disabled={sending}
+                disabled={!connected || sending}
                 maxLength={200}
                 className="h-10 text-sm bg-gray-800/50 border-cyan-500/50 text-white placeholder:text-gray-500"
               />
               <Button 
                 type="submit" 
-                disabled={!message.trim() || sending}
+                disabled={!connected || !message.trim() || sending}
                 className="h-10 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-sm"
               >
                 {sending ? '⚙️' : '📤'}

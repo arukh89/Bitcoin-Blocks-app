@@ -563,6 +563,12 @@ export function AdminPanel(): JSX.Element {
               >
                 {loading ? '⚙️ Starting...' : !connected ? '🔌 Connecting...' : '🔔 Start Round & Announce'}
               </Button>
+              {/* Hint when announcements require FID but admin is not FID */}
+              {getBool('admin_announce_requires_fid', true) && user && !user.address.startsWith('fid-') && (
+                <p className="text-[10px] text-red-400 mt-2 text-center">
+                  🔒 Announcements require Farcaster login (FID). Set <span className="font-mono">admin_announce_requires_fid = false</span> in Site Settings to allow wallet-only.
+                </p>
+              )}
               {!connected && (
                 <p className="text-xs text-red-400 mt-2 text-center">
                   ⚠️ Waiting for database connection...
