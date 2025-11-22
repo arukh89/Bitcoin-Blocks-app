@@ -1,4 +1,4 @@
-// Real SpacetimeDB client connection using official SDK
+﻿// Real SpacetimeDB client connection using official SDK
 import { DbConnection, type RemoteTables, type RemoteReducers } from '@/spacetime_module_bindings/index'
 
 // SpacetimeDB connection settings
@@ -14,7 +14,10 @@ let connectionError: string | null = null
 let retryCount = 0
 const MAX_RETRIES = 3
 
-export async function connectToSpacetime(): Promise<DbConnection> {
+export async function connectToSpacetime(opts?: {
+  onConnect?: () => void
+  onDisconnect?: () => void
+}): Promise<DbConnection> {
   // Return existing connection if available
   if (dbConnection) {
     console.log('♻️ Reusing existing SpacetimeDB connection')
@@ -48,28 +51,18 @@ export async function connectToSpacetime(): Promise<DbConnection> {
     const connectionPromise = DbConnection.builder()
       .withUri(SPACETIME_HOST)
       .withModuleName(SPACETIME_DB_NAME)
-      .onConnect((token, identity, address) => {
+      .onConnect((_token, identity, address) => {
         console.log('✅ Connected to SpacetimeDB')
         console.log('Identity:', identity)
         console.log('Address:', address)
         retryCount = 0 // Reset retry count on successful connection
         connectionError = null
+        try { opts?.onConnect?.() } catch (e) { console.warn('onConnect callback error', e) }
       })
       .onDisconnect((_closeCode, _closeReason) => {
         console.log('❌ Disconnected from SpacetimeDB')
-        // console.log('Code:', closeCode, 'Reason:', closeReason)
         dbConnection = null
-        
-        // Attempt to reconnect if not a clean disconnect
-        if (retryCount < MAX_RETRIES) {
-          console.log('🔄 Attempting to reconnect...')
-          setTimeout(() => {
-            retryCount++
-            connectToSpacetime().catch(err => {
-              console.error('Reconnection failed:', err)
-            })
-          }, 2000 * (retryCount + 1)) // Exponential backoff
-        }
+        try { opts?.onDisconnect?.() } catch (e) { console.warn('onDisconnect callback error', e) }
       })
       .build()
     
@@ -104,7 +97,7 @@ export async function connectToSpacetime(): Promise<DbConnection> {
     }
     
     console.error('\n📖 TO FIX THIS:')
-    console.error('1. Install SpacetimeDB CLI: curl --proto \'=https\' --tlsv1.2 -sSf https://install.spacetimedb.com | sh')
+    console.error(`1. Install SpacetimeDB CLI: curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh`)
     
     if (isMaincloud) {
       console.error('2. Publish to maincloud: cd spacetime-server && spacetime publish', SPACETIME_DB_NAME, '--server maincloud')
