@@ -1,3 +1,4 @@
+import 'client-only'
 import { createConfig, http } from 'wagmi'
 import { base, arbitrum } from 'wagmi/chains'
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
