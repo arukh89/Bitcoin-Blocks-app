@@ -56,7 +56,7 @@ export async function connectToSpacetime(opts?: {
     const connectionPromise = DbConnection.builder()
       .withUri(SPACETIME_HOST)
       .withModuleName(SPACETIME_DB_NAME)
-      .onConnect((_token, identity, address) => {
+      .onConnect((_token: unknown, identity: unknown, address: unknown) => {
         console.log('✅ Connected to SpacetimeDB')
         console.log('Identity:', identity)
         console.log('Address:', address)
@@ -64,7 +64,7 @@ export async function connectToSpacetime(opts?: {
         connectionError = null
         try { opts?.onConnect?.() } catch (e) { console.warn('onConnect callback error', e) }
       })
-      .onDisconnect((_closeCode, _closeReason) => {
+      .onDisconnect((_closeCode: unknown, _closeReason: unknown) => {
         console.log('❌ Disconnected from SpacetimeDB')
         dbConnection = null
         try { opts?.onDisconnect?.() } catch (e) { console.warn('onDisconnect callback error', e) }
