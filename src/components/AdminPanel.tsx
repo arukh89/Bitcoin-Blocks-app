@@ -383,7 +383,7 @@ export function AdminPanel(): JSX.Element {
       setLoading(true)
       
       // Convert to BigInt for SpacetimeDB
-      client.reducers.savePrizeConfig(
+      await client.reducers.savePrizeConfig(
         BigInt(Math.floor(jackpotNum)),
         BigInt(Math.floor(firstNum)),
         BigInt(Math.floor(secondNum)),
