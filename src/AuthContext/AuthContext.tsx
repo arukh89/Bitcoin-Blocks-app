@@ -34,7 +34,7 @@ interface AuthContextType {
   authMode: AuthMode | null
   isAuthenticated: boolean
   isInFarcaster: boolean
-  signInWithNeynar: (profile?: { fid: number, username?: string | null, displayName?: string | null, pfpUrl?: string | null }) => Promise<void>
+  signInWithNeynar: (profile?: { fid?: number, username?: string | null, displayName?: string | null, pfpUrl?: string | null }) => Promise<void>
   signInWithWallet: (address: string) => Promise<void>
   signOut: () => void
   logout: () => void
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   // ===========================================
   // NEYNAR SIGN IN (Web Context)
   // ===========================================
-  const signInWithNeynar = useCallback(async (profile?: { fid: number, username?: string | null, displayName?: string | null, pfpUrl?: string | null }): Promise<void> => {
+  const signInWithNeynar = useCallback(async (profile?: { fid?: number, username?: string | null, displayName?: string | null, pfpUrl?: string | null }): Promise<void> => {
     try {
       console.log('🔐 Farcaster web auth (AuthKit) start')
       if (profile && profile.fid) {

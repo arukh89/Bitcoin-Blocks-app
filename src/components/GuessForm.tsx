@@ -159,6 +159,11 @@ export function GuessForm(): JSX.Element {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuess(e.target.value)}
               disabled={loading || isRoundLocked || !connected || !user || !activeRound || alreadyGuessed || !isFidUser}
               required
+              min={getInt('guess_min', 1)}
+              max={getInt('guess_max', 20000)}
+              step={1}
+              inputMode="numeric"
+              pattern="[0-9]*"
               className="h-14 text-lg font-bold text-center bg-gray-800/50 border-2 border-orange-500/50 text-white placeholder:text-gray-500 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/50 transition-all"
             />
           </div>
