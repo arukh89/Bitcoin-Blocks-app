@@ -24,5 +24,5 @@ declare module 'spacetimedb' {
   export type EventContextInterface = any
   export type ReducerEventContextInterface = any
   export type SubscriptionEventContextInterface = any
-  export type TableHandle = any
+  export interface TableHandle<T = any> {}
 }
