@@ -3,16 +3,18 @@ import { createConfig, http } from 'wagmi'
 import { base, arbitrum } from 'wagmi/chains'
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 
-// WalletConnect Project ID - get from https://cloud.walletconnect.com
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_WALLETCONNECT_PROJECT_ID'
+// WalletConnect: enable only when env is provided; no hardcoded fallback
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+
+const connectors = [
+  injected(),
+  coinbaseWallet({ appName: 'Bitcoin Blocks' }),
+  ...(projectId ? [walletConnect({ projectId })] : []),
+]
 
 export const wagmiConfig = createConfig({
   chains: [base, arbitrum],
-  connectors: [
-    injected(),
-    walletConnect({ projectId }),
-    coinbaseWallet({ appName: 'Bitcoin Blocks' })
-  ],
+  connectors,
   transports: {
     [base.id]: http(),
     [arbitrum.id]: http()
