@@ -235,14 +235,26 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   useEffect(() => {
     if (!client || !connected) return
     if (initSnapshotDone) return
-    try {
-      console.log('🚀 [REALTIME] Forcing initial snapshot (getActiveRound, getPrizeConfig)')
-      client.reducers.getActiveRound()
-      client.reducers.getPrizeConfig()
-      setInitSnapshotDone(true)
-    } catch (e) {
-      console.warn('⚠️ [REALTIME] Initial snapshot trigger failed:', e)
+    let cancelled = false
+    const run = async (): Promise<void> => {
+      const maxRetries = 3
+      const backoff = 400
+      for (let i = 0; i < maxRetries && !cancelled; i++) {
+        try {
+          console.log('🚀 [REALTIME] Initial snapshot attempt', i + 1)
+          await client.reducers.getActiveRound()
+          await client.reducers.getPrizeConfig()
+          if (!cancelled) setInitSnapshotDone(true)
+          console.log('✅ [REALTIME] Initial snapshot completed')
+          return
+        } catch (e) {
+          console.warn(`⚠️ [REALTIME] Initial snapshot failed (attempt ${i + 1})`, e)
+          await new Promise(r => setTimeout(r, backoff * (i + 1)))
+        }
+      }
     }
+    run().catch(console.error)
+    return () => { cancelled = true }
   }, [client, connected, initSnapshotDone])
 
   // ===========================================
@@ -602,7 +614,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       const blockNumBigInt = blockNumber !== undefined ? BigInt(blockNumber) : undefined
       
       console.log('📤 [REALTIME] Creating round...', { roundNumber, durationMinutes: durationMinutes.toString(), prize, blockNumber })
-      client.reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt)
+      await client.reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt)
       console.log('✅ [REALTIME] Round created successfully!')
     } catch (error) {
       console.error('❌ [REALTIME] Failed to create round:', error)
@@ -652,7 +664,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
         return false
       }
 
-      client.reducers.submitGuess(
+      await client.reducers.submitGuess(
         BigInt(roundId),
         BigInt(fidNum),
         username,
@@ -681,7 +693,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     try {
-      client.reducers.endRoundManually(BigInt(roundId))
+      await client.reducers.endRoundManually(BigInt(roundId))
       console.log('✅ [REALTIME] Round ended!')
       return true
     } catch (error) {
@@ -709,7 +721,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       throw new Error('Invalid winner FID')
     }
 
-    client.reducers.updateRoundResult(
+    await client.reducers.updateRoundResult(
       BigInt(roundId),
       BigInt(actualTxCount),
       blockHash,
@@ -739,7 +751,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     try {
       console.log('📤 [REALTIME] Sending chat message...')
       
-      client.reducers.sendChatMessage(
+      await client.reducers.sendChatMessage(
         message.roundId,
         message.address,
         message.username,
@@ -772,7 +784,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       if (!('dailyCheckin' in (client.reducers as any))) {
         return { success: false, error: 'Check-in not available on this deployment' }
       }
-      ;(client.reducers as any).dailyCheckin(userIdentifier, username, pfpUrl)
+      await (client.reducers as any).dailyCheckin(userIdentifier, username, pfpUrl)
       
       console.log('✅ [REALTIME] Check-in successful!')
       
