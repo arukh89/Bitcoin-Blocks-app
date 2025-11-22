@@ -1,32 +1,34 @@
-import * as React from "react"
-import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { cn } from "@/lib/utils"
+import * as React from 'react'
 
-export const Dialog = DialogPrimitive.Root
-export const DialogTrigger = DialogPrimitive.Trigger
+type DialogProps = {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  children: React.ReactNode
+}
 
-export const DialogContent = ({ className, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) => (
-  <DialogPrimitive.Portal>
-    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-    <DialogPrimitive.Content
-      className={cn(
-        "fixed z-50 grid w-full gap-4 border bg-background p-6 shadow-lg duration-200",
-        "left-[50%] top-[50%] -translate-x-[50%] -translate-y-[50%] sm:rounded-lg",
-        className
-      )}
-      {...props}
-    />
-  </DialogPrimitive.Portal>
-)
+export function Dialog({ open = true, onOpenChange, children }: DialogProps): JSX.Element {
+  React.useEffect(() => {
+    onOpenChange?.(open)
+  }, [open, onOpenChange])
+  return <div role="dialog" aria-modal={open} className="fixed inset-0 z-50 flex items-center justify-center">{children}</div>
+}
 
-export const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />
-)
+export function DialogContent({ children, className }: React.PropsWithChildren<{ className?: string }>): JSX.Element {
+  return (
+    <div className={`relative bg-black/90 border border-white/10 rounded-xl p-4 shadow-xl ${className || ''}`}>
+      {children}
+    </div>
+  )
+}
 
-export const DialogTitle = ({ className, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>) => (
-  <DialogPrimitive.Title className={cn("text-lg font-semibold leading-none tracking-tight", className)} {...props} />
-)
+export function DialogHeader({ children }: React.PropsWithChildren): JSX.Element {
+  return <div className="mb-3">{children}</div>
+}
 
-export const DialogDescription = ({ className, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>) => (
-  <DialogPrimitive.Description className={cn("text-sm text-muted-foreground", className)} {...props} />
-)
+export function DialogTitle({ children, className }: React.PropsWithChildren<{ className?: string }>): JSX.Element {
+  return <h3 className={`text-lg font-bold ${className || ''}`}>{children}</h3>
+}
+
+export function DialogDescription({ children, className }: React.PropsWithChildren<{ className?: string }>): JSX.Element {
+  return <p className={`text-sm text-gray-400 ${className || ''}`}>{children}</p>
+}

@@ -1,11 +1,7 @@
 import type { Metadata } from 'next'
-export const dynamic = 'force-dynamic'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import '@rainbow-me/rainbowkit/styles.css'
-import '@farcaster/auth-kit/styles.css'
-import NextDynamic from 'next/dynamic'
-const Providers = NextDynamic(() => import('./providers').then(m => m.Providers), { ssr: false })
+import { Providers } from '@/app/providers'
 import { Toaster } from '@/components/ui/sonner'
 
 const inter = Inter({
@@ -33,20 +29,13 @@ export default function RootLayout({
 export const metadata: Metadata = {
   title: 'Bitcoin Blocks',
   description: 'Predict Bitcoin transactions & compete! Login, guess, and win by forecasting the next block\'s transaction count. Real-time updates and leaderboard powered by Supabase. Join the battle!',
-  other: { 
-    'fc:frame': JSON.stringify({
-      'version': 'next',
-      'imageUrl': 'https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/thumbnail_cmgifd2dg000204jp98x53ays-p9n6Mjcrk6gppFNpz3AczxHR2Yz5kR',
-      'button': {
-        'title': 'Launch Bitcoin Blocks',
-        'action': {
-          'type': 'launch_frame',
-          'name': 'Bitcoin Blocks',
-          'url': 'https://bitcoin-blocks-app.vercel.app',
-          'splashImageUrl': 'https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/farcaster/splash_images/splash_image1.svg',
-          'splashBackgroundColor': '#ffffff'
-        }
-      }
-    }) 
+  other: {
+    'fc:miniapp': JSON.stringify({
+      version: '1',
+      name: process.env.NEXT_PUBLIC_MINIAPP_NAME || 'Bitcoin Blocks',
+      url: process.env.NEXT_PUBLIC_MINIAPP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      splashImageUrl: process.env.NEXT_PUBLIC_MINIAPP_SPLASH_IMAGE_URL || '',
+      splashBackgroundColor: process.env.NEXT_PUBLIC_MINIAPP_SPLASH_BG || '#ffffff'
+    })
   }
 }

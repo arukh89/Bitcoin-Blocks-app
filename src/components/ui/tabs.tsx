@@ -1,26 +1,41 @@
-import * as React from "react"
-import * as TabsPrimitive from "@radix-ui/react-tabs"
-import { cn } from "@/lib/utils"
+import * as React from 'react'
 
-export const Tabs = TabsPrimitive.Root
+type TabsContextType = {
+  value: string
+  setValue: (v: string) => void
+}
 
-export const TabsList = ({ className, ...props }: React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>) => (
-  <TabsPrimitive.List className={cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground", className)} {...props} />
-)
+const TabsCtx = React.createContext<TabsContextType | null>(null)
 
-export const TabsTrigger = ({ className, ...props }: React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>) => (
-  <TabsPrimitive.Trigger
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-      "disabled:pointer-events-none disabled:opacity-50",
-      "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
-      className
-    )}
-    {...props}
-  />
-)
+export function Tabs({ defaultValue, children, className }: React.PropsWithChildren<{ defaultValue: string; className?: string }>): JSX.Element {
+  const [value, setValue] = React.useState(defaultValue)
+  return (
+    <TabsCtx.Provider value={{ value, setValue }}>
+      <div className={className}>{children}</div>
+    </TabsCtx.Provider>
+  )
+}
 
-export const TabsContent = ({ className, ...props }: React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>) => (
-  <TabsPrimitive.Content className={cn("mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", className)} {...props} />
-)
+export function TabsList({ children, className }: React.PropsWithChildren<{ className?: string }>): JSX.Element {
+  return <div className={`flex gap-2 p-1 rounded-lg ${className || ''}`}>{children}</div>
+}
+
+export function TabsTrigger({ value, children, className }: React.PropsWithChildren<{ value: string; className?: string }>): JSX.Element {
+  const ctx = React.useContext(TabsCtx)!
+  const active = ctx.value === value
+  return (
+    <button
+      type="button"
+      onClick={() => ctx.setValue(value)}
+      className={`px-3 py-2 rounded-md ${active ? 'bg-white/10 text-white' : 'text-gray-400'} ${className || ''}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function TabsContent({ value, children, className }: React.PropsWithChildren<{ value: string; className?: string }>): JSX.Element | null {
+  const ctx = React.useContext(TabsCtx)!
+  if (ctx.value !== value) return null
+  return <div className={className}>{children}</div>
+}

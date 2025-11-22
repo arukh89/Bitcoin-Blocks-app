@@ -1,9 +1,9 @@
-﻿'use client'
+'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import type { Round, Guess, Log, User, ChatMessage, PrizeConfiguration } from '@/types/game'
 import type { UserStats, CheckInRecord, WeeklyLeaderboardEntry, CheckInResult } from '@/types/checkin'
-import { useAuth, ADMIN_FIDS, isAdminFid, isAdminWallet, ADMIN_WALLETS } from '@/context/AuthContext'
+import { useAuth, isAdminFid } from '@/AuthContext/AuthContext'
 
 // Real-time client import
 import { connectToSpacetime, type DbConnection } from '@/lib/spacetime-client'
@@ -14,7 +14,7 @@ import type {
   LogEvent as STDBLog,
   ChatMessage as STDBChatMsg,
   PrizeConfig as STDBPrizeConfig 
-} from '@/spacetime_module_bindings/index'
+} from '@/spacetime_module_bindings'
 
 interface GameContextType {
   rounds: Round[]
@@ -32,11 +32,6 @@ interface GameContextType {
   addChatMessage: (message: ChatMessage) => void
   connected: boolean
   client: DbConnection | null
-  // Settings
-  settings: Record<string, string>
-  getSetting: (k: string, def?: string) => string | undefined
-  getInt: (k: string, def: number) => number
-  getBool: (k: string, def: boolean) => boolean
   // Check-in functions
   checkIn: (userIdentifier: string, username: string, pfpUrl: string) => Promise<CheckInResult>
   userStats: UserStats | null
@@ -45,21 +40,6 @@ interface GameContextType {
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined)
-
-export { ADMIN_FIDS, isAdminFid, ADMIN_WALLETS, isAdminWallet }
-
-export function isDevAddress(addr: string): boolean {
-  if (!addr) return false
-  if (addr.startsWith('fid-')) {
-    const fid = Number(addr.slice(4))
-    return isAdminFid(fid)
-  }
-  // Wallet admin support
-  if (/^0x[a-fA-F0-9]{40}$/.test(addr)) {
-    return isAdminWallet(addr)
-  }
-  return false
-}
 
 // Convert SpacetimeDB bigint timestamps to JS milliseconds
 function toMillis(bigintSeconds: bigint): number {
@@ -76,7 +56,7 @@ function convertRound(r: STDBRound): Round {
     status: r.status as 'open' | 'closed' | 'finished',
     blockNumber: r.blockNumber ? Number(r.blockNumber) : undefined,
     actualTxCount: r.actualTxCount ? Number(r.actualTxCount) : undefined,
-    winningAddress: r.winningFid ? `fid-${r.winningFid.toString()}` : undefined,
+    winningAddress: r.winningFid ? `0x${r.winningFid.toString(16).padStart(40, '0')}` : undefined,
     blockHash: r.blockHash || undefined,
     createdAt: toMillis(r.createdAt),
     duration: Number(r.durationMinutes)
@@ -87,7 +67,7 @@ function convertGuess(g: STDBGuess): Guess {
   return {
     id: String(g.guessId),
     roundId: String(g.roundId),
-    address: `fid-${g.fid.toString()}`,
+    address: `0x${g.fid.toString(16).padStart(40, '0')}`,
     username: g.username,
     guess: Number(g.guess),
     pfpUrl: g.pfpUrl || '',
@@ -124,6 +104,7 @@ function convertPrizeConfig(p: STDBPrizeConfig): PrizeConfiguration {
     firstPlaceAmount: String(p.firstPlaceAmount),
     secondPlaceAmount: String(p.secondPlaceAmount),
     currencyType: p.currencyType,
+    tokenContractAddress: p.tokenContractAddress,
     updatedAt: toMillis(p.updatedAt)
   }
 }
@@ -140,11 +121,10 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [checkInRecords, setCheckInRecords] = useState<CheckInRecord[]>([])
   const [hasCheckedInToday, setHasCheckedInToday] = useState<boolean>(false)
-  const [weeklyCheckInLeaderboard, setWeeklyCheckInLeaderboard] = useState<WeeklyLeaderboardEntry[]>([])
-  const [initSnapshotDone, setInitSnapshotDone] = useState<boolean>(false)
-  const [settings, setSettings] = useState<Record<string, string>>({})
 
   const activeRound = rounds.find(r => r.status === 'open') || null
+
+  // Authentication is now handled by AuthContext
 
   // ===========================================
   // DATABASE CONNECTION (REALTIME ONLY)
@@ -152,115 +132,33 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   useEffect(() => {
     let mounted = true
 
-    async function initConnection(): Promise<void> {
+    const initConnection = async (): Promise<void> => {
       try {
         console.log('🟢 Initializing REALTIME mode...')
         setConnected(false)
-
+        
         console.log('🔌 Connecting to SpacetimeDB...')
-        const conn = await connectToSpacetime({
-          onConnect: () => {
-            if (!mounted) return
-            setConnected(true)
-          },
-          onDisconnect: () => {
-            if (!mounted) return
-            setConnected(false)
-            setClient(null)
-            setInitSnapshotDone(false)
-            // Try to reconnect with backoff
-            setTimeout(() => { if (mounted) initConnection().catch(console.error) }, 2000)
-          }
-        })
-
-        if (!mounted) return
-
-        // (moved) subscribeToAllTables will be invoked after connection is ready in a separate effect
-
-        setClient(conn)
-        console.log('✅ SpacetimeDB Client connected')
-        setConnected(true)
-        console.log('✅ REALTIME Connection established!')
-        console.log('🟢 Database connection ready')
+        const conn = await connectToSpacetime()
+        
+        if (mounted) {
+          setClient(conn)
+          console.log('✅ SpacetimeDB Client connected')
+          setConnected(true)
+          console.log('✅ REALTIME Connection established!')
+          console.log('🟢 Database connection ready')
+        }
       } catch (error) {
         console.error('❌ Failed to connect to SpacetimeDB:', error)
         setConnected(false)
       }
     }
 
-    initConnection().catch(console.error)
+    initConnection()
 
     return () => {
       mounted = false
     }
   }, [])
-
-  // Subscribe to all tables only after client is set and connection is confirmed open
-  useEffect(() => {
-    if (!client || !connected) return
-    try {
-      ;(client.subscriptionBuilder() as any).subscribeToAllTables?.()
-      console.log('✅ [REALTIME] Subscribed to all tables')
-    } catch (e) {
-      console.warn('subscribeToAllTables not available or failed', e)
-    }
-  }, [client, connected])
-
-  // ===========================================
-  // Subscribe to settings table (key/value)
-  // ===========================================
-  useEffect(() => {
-    if (!client) return
-    const onInsert = (_ctx: any, row: any) => setSettings(prev => ({ ...prev, [row.key]: row.value }))
-    const onUpdate = (_ctx: any, _old: any, row: any) => setSettings(prev => ({ ...prev, [row.key]: row.value }))
-    ;((client as any).db as any).settings?.onInsert(onInsert)
-    ;((client as any).db as any).settings?.onUpdate(onUpdate)
-    const initial: Record<string, string> = {}
-    for (const row of ((((client as any).db as any).settings?.iter() || []))) {
-      initial[row.key] = row.value
-    }
-    if (Object.keys(initial).length) setSettings(initial)
-    return () => {
-      try {
-        ((client as any).db as any).settings?.removeOnInsert(onInsert)
-        ((client as any).db as any).settings?.removeOnUpdate(onUpdate)
-      } catch {}
-    }
-  }, [client])
-
-  const getSetting = useCallback((k: string, def?: string) => settings[k] ?? def, [settings])
-  const getInt = useCallback((k: string, def: number) => {
-    const s = settings[k]; const n = s ? parseInt(s, 10) : NaN; return Number.isFinite(n) ? n : def
-  }, [settings])
-  const getBool = useCallback((k: string, def: boolean) => {
-    const s = (settings[k] || '').toLowerCase(); if (s === 'true' || s === '1') return true; if (s === 'false' || s === '0') return false; return def
-  }, [settings])
-
-  // Force an initial snapshot to ensure caches are populated (FullUpdate)
-  useEffect(() => {
-    if (!client || !connected) return
-    if (initSnapshotDone) return
-    let cancelled = false
-    const run = async (): Promise<void> => {
-      const maxRetries = 3
-      const backoff = 400
-      for (let i = 0; i < maxRetries && !cancelled; i++) {
-        try {
-          console.log('🚀 [REALTIME] Initial snapshot attempt', i + 1)
-          await (client as any).reducers.getActiveRound()
-          await (client as any).reducers.getPrizeConfig()
-          if (!cancelled) setInitSnapshotDone(true)
-          console.log('✅ [REALTIME] Initial snapshot completed')
-          return
-        } catch (e) {
-          console.warn(`⚠️ [REALTIME] Initial snapshot failed (attempt ${i + 1})`, e)
-          await new Promise(r => setTimeout(r, backoff * (i + 1)))
-        }
-      }
-    }
-    run().catch(console.error)
-    return () => { cancelled = true }
-  }, [client, connected, initSnapshotDone])
 
   // ===========================================
   // Subscribe to rounds table
@@ -270,7 +168,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to rounds table...')
 
-    const onInsertCb = (ctx: any, row: any) => {
+    const unsubscribe = client.db.rounds.onInsert((ctx, row) => {
       const converted = convertRound(row)
       console.log('➕ [REALTIME] New round inserted:', converted)
       setRounds(prev => {
@@ -278,26 +176,22 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
         if (exists) return prev
         return [...prev, converted]
       })
-    }
-    const onUpdateCb = (ctx: any, _oldRow: any, newRow: any) => {
+    })
+
+    const unsubscribeUpdate = client.db.rounds.onUpdate((ctx, oldRow, newRow) => {
       const converted = convertRound(newRow)
       console.log('🔄 [REALTIME] Round updated:', converted)
       setRounds(prev => prev.map(r => r.id === converted.id ? converted : r))
-    }
-
-    ;((client as any).db as any).rounds.onInsert(onInsertCb)
-    ;((client as any).db as any).rounds.onUpdate(onUpdateCb)
+    })
 
     // Load initial data
-    const initialRounds = Array.from<any>(((client as any).db as any).rounds.iter()).map(convertRound)
+    const initialRounds = Array.from(client.db.rounds.iter()).map(convertRound)
     console.log('📥 [REALTIME] Initial rounds loaded:', initialRounds)
     setRounds(initialRounds)
 
     return () => {
-      try {
-        ;((client as any).db as any).rounds.removeOnInsert(onInsertCb)
-        ;((client as any).db as any).rounds.removeOnUpdate(onUpdateCb)
-      } catch {}
+      unsubscribe()
+      unsubscribeUpdate()
     }
   }, [client])
 
@@ -306,12 +200,11 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   // ===========================================
   useEffect(() => {
     if (!client || !user) return
-    if (!((client as any).db?.userStats) || !((client as any).db?.checkins)) return
 
     console.log('📊 [REALTIME] Subscribing to user_stats and checkins tables...')
 
     // Subscribe to user_stats
-    const onUserStatsInsert = (ctx: any, row: any) => {
+    const unsubscribeUserStats = client.db.userStats.onInsert((ctx: any, row: any) => {
       if (row.userIdentifier === user.address) {
         setUserStats({
           userIdentifier: row.userIdentifier,
@@ -326,9 +219,9 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
           updatedAt: Number(row.updatedAt) * 1000
         })
       }
-    }
+    })
 
-    const onUserStatsUpdate = (ctx: any, _oldRow: any, newRow: any) => {
+    const unsubscribeUserStatsUpdate = client.db.userStats.onUpdate((ctx: any, oldRow: any, newRow: any) => {
       if (newRow.userIdentifier === user.address) {
         setUserStats({
           userIdentifier: newRow.userIdentifier,
@@ -343,13 +236,10 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
           updatedAt: Number(newRow.updatedAt) * 1000
         })
       }
-    }
-
-    ;((client as any).db as any).userStats.onInsert(onUserStatsInsert)
-    ;((client as any).db as any).userStats.onUpdate(onUserStatsUpdate)
+    })
 
     // Load initial user_stats
-    for (const stat of (((client as any).db as any).userStats.iter())) {
+    for (const stat of client.db.userStats.iter()) {
       if (stat.userIdentifier === user.address) {
         setUserStats({
           userIdentifier: stat.userIdentifier,
@@ -368,7 +258,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     // Subscribe to checkins
-    const onCheckinsInsert = (ctx: any, row: any) => {
+    const unsubscribeCheckins = client.db.checkins.onInsert((ctx: any, row: any) => {
       if (row.userIdentifier === user.address) {
         setCheckInRecords(prev => [{
           checkinId: String(row.checkinId),
@@ -380,13 +270,11 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
           streakCount: Number(row.streakCount)
         }, ...prev])
       }
-    }
-
-    ;((client as any).db as any).checkins.onInsert(onCheckinsInsert)
+    })
 
     // Load initial checkins
     const userCheckins: CheckInRecord[] = []
-    for (const checkin of (((client as any).db as any).checkins.iter())) {
+    for (const checkin of client.db.checkins.iter()) {
       if (checkin.userIdentifier === user.address) {
         userCheckins.push({
           checkinId: String(checkin.checkinId),
@@ -402,11 +290,9 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     setCheckInRecords(userCheckins)
 
     return () => {
-      try {
-        ((client as any).db as any).userStats.removeOnInsert(onUserStatsInsert)
-        ((client as any).db as any).userStats.removeOnUpdate(onUserStatsUpdate)
-        ((client as any).db as any).checkins.removeOnInsert(onCheckinsInsert)
-      } catch {}
+      unsubscribeUserStats()
+      unsubscribeUserStatsUpdate()
+      unsubscribeCheckins()
     }
   }, [client, user])
 
@@ -428,20 +314,16 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     setHasCheckedInToday(!!todayCheckin)
   }, [checkInRecords])
 
-  // Calculate weekly leaderboard (recomputes when client or check-in records change)
-  useEffect(() => {
-    if (!client || !((client as any).db?.checkins) || !((client as any).db?.userStats)) {
-      setWeeklyCheckInLeaderboard([])
-      return
-    }
+  // Calculate weekly leaderboard
+  const weeklyCheckInLeaderboard = React.useMemo(() => {
+    if (!client) return []
 
     const now = Date.now() / 1000
-    const windowDays = getInt('checkin_week_window_days', 7)
-    const weekAgo = now - (windowDays * 86400)
+    const weekAgo = now - (7 * 86400)
     const userMap = new Map<string, WeeklyLeaderboardEntry>()
 
     // Count check-ins in last 7 days
-    for (const checkin of (((client as any).db as any).checkins.iter())) {
+    for (const checkin of client.db.checkins.iter()) {
       if (Number(checkin.checkinDate) >= weekAgo) {
         const existing = userMap.get(checkin.userIdentifier)
         if (existing) {
@@ -460,7 +342,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     // Add user stats data
-    for (const stat of (((client as any).db as any).userStats.iter())) {
+    for (const stat of client.db.userStats.iter()) {
       const entry = userMap.get(stat.userIdentifier)
       if (entry) {
         entry.currentStreak = Number(stat.currentStreak)
@@ -468,17 +350,16 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       }
     }
 
-    const leaderboard = Array.from(userMap.values())
+    // Convert to array and sort
+    return Array.from(userMap.values())
       .sort((a, b) => {
         if (b.weeklyCheckins !== a.weeklyCheckins) {
           return b.weeklyCheckins - a.weeklyCheckins
         }
         return b.totalPoints - a.totalPoints
       })
-      .slice(0, 10)
-
-    setWeeklyCheckInLeaderboard(leaderboard)
-  }, [client, checkInRecords, getInt])
+      .slice(0, 10) // Top 10
+  }, [client, checkInRecords])
 
   // ===========================================
   // Subscribe to guesses table
@@ -488,7 +369,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to guesses table...')
 
-    const onInsertCb = (ctx: any, row: any) => {
+    const unsubscribe = client.db.guesses.onInsert((ctx, row) => {
       const converted = convertGuess(row)
       console.log('➕ [REALTIME] New guess inserted:', converted)
       setGuesses(prev => {
@@ -496,18 +377,14 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
         if (exists) return prev
         return [...prev, converted]
       })
-    }
-
-    ;((client as any).db as any).guesses.onInsert(onInsertCb)
+    })
 
     // Load initial data
-    const initialGuesses = Array.from<any>(((client as any).db as any).guesses.iter()).map(convertGuess)
+    const initialGuesses = Array.from(client.db.guesses.iter()).map(convertGuess)
     console.log('📥 [REALTIME] Initial guesses loaded:', initialGuesses.length, 'guesses')
     setGuesses(initialGuesses)
 
-    return () => {
-      try { ;((client as any).db as any).guesses.removeOnInsert(onInsertCb) } catch {}
-    }
+    return unsubscribe
   }, [client])
 
   // ===========================================
@@ -516,22 +393,20 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   useEffect(() => {
     if (!client) return
 
-    const onInsertCb = (ctx: any, row: any) => {
+    const unsubscribe = client.db.logs.onInsert((ctx, row) => {
       const converted = convertLog(row)
       setLogs(prev => {
         const exists = prev.find(l => l.id === converted.id)
         if (exists) return prev
         return [...prev, converted]
       })
-    }
-
-    ;((client as any).db as any).logs.onInsert(onInsertCb)
+    })
 
     // Load initial data
-    const initialLogs = Array.from<any>(((client as any).db as any).logs.iter()).map(convertLog)
+    const initialLogs = Array.from(client.db.logs.iter()).map(convertLog)
     setLogs(initialLogs)
 
-    return () => { try { ;((client as any).db as any).logs.removeOnInsert(onInsertCb) } catch {} }
+    return unsubscribe
   }, [client])
 
   // ===========================================
@@ -542,7 +417,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to chat messages table...')
 
-    const onInsertCb = (ctx: any, row: any) => {
+    const unsubscribe = client.db.chatMessages.onInsert((ctx, row) => {
       const converted = convertChatMsg(row)
       console.log('➕ [REALTIME] New chat message:', converted)
       setChatMessages(prev => {
@@ -550,16 +425,14 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
         if (exists) return prev
         return [converted, ...prev].slice(0, 100)
       })
-    }
-
-    ;((client as any).db as any).chatMessages.onInsert(onInsertCb)
+    })
 
     // Load initial data
-    const initialChat = Array.from<any>(((client as any).db as any).chatMessages.iter()).map(convertChatMsg)
+    const initialChat = Array.from(client.db.chatMessages.iter()).map(convertChatMsg)
     console.log('📥 [REALTIME] Initial chat messages loaded:', initialChat.length, 'messages')
     setChatMessages(initialChat.sort((a, b) => b.timestamp - a.timestamp).slice(0, 100))
 
-    return () => { try { ;((client as any).db as any).chatMessages.removeOnInsert(onInsertCb) } catch {} }
+    return unsubscribe
   }, [client])
 
   // ===========================================
@@ -570,33 +443,28 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to prize config table...')
 
-    const onInsertCb = (ctx: any, row: any) => {
+    const unsubscribe = client.db.prizeConfigs.onInsert((ctx, row) => {
       const converted = convertPrizeConfig(row)
       console.log('➕ [REALTIME] New prize config:', converted)
       setPrizeConfig(converted)
-    }
+    })
 
-    const onUpdateCb = (ctx: any, _oldRow: any, newRow: any) => {
+    const unsubscribeUpdate = client.db.prizeConfigs.onUpdate((ctx, oldRow, newRow) => {
       const converted = convertPrizeConfig(newRow)
       console.log('🔄 [REALTIME] Prize config updated:', converted)
       setPrizeConfig(converted)
-    }
-
-    ;((client as any).db as any).prizeConfig.onInsert(onInsertCb)
-    ;((client as any).db as any).prizeConfig.onUpdate(onUpdateCb)
+    })
 
     // Load initial data
-    const initialConfigs = Array.from<any>(((client as any).db as any).prizeConfig.iter()).map(convertPrizeConfig)
+    const initialConfigs = Array.from(client.db.prizeConfigs.iter()).map(convertPrizeConfig)
     if (initialConfigs.length > 0) {
       console.log('📥 [REALTIME] Initial prize config loaded:', initialConfigs[0])
       setPrizeConfig(initialConfigs[0])
     }
 
     return () => {
-      try {
-        ;((client as any).db as any).prizeConfig.removeOnInsert(onInsertCb)
-        ;((client as any).db as any).prizeConfig.removeOnUpdate(onUpdateCb)
-      } catch {}
+      unsubscribe()
+      unsubscribeUpdate()
     }
   }, [client])
 
@@ -616,10 +484,10 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     try {
       const roundNumBigInt = BigInt(roundNumber)
       const durationMinutes = BigInt(duration || 10)
-      const blockNumBigInt = blockNumber !== undefined ? BigInt(blockNumber) : undefined
+      const blockNumBigInt = blockNumber !== undefined ? BigInt(blockNumber) : null
       
       console.log('📤 [REALTIME] Creating round...', { roundNumber, durationMinutes: durationMinutes.toString(), prize, blockNumber })
-      await (client as any).reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt)
+      client.reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt)
       console.log('✅ [REALTIME] Round created successfully!')
     } catch (error) {
       console.error('❌ [REALTIME] Failed to create round:', error)
@@ -658,25 +526,18 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     try {
-      // Require FID-based address ("fid-<number>") for submissions
-      if (!address.startsWith('fid-')) {
-        console.warn('⚠️ [REALTIME] Guess requires Farcaster login (FID-only)')
-        return false
-      }
-      const fidNum = Number(address.slice(4))
-      if (!Number.isFinite(fidNum) || fidNum <= 0) {
-        console.warn('⚠️ [REALTIME] Invalid FID in address:', address)
-        return false
-      }
-
-      await (client as any).reducers.submitGuess(
+      // Convert hex address to BigInt (remove 0x prefix first)
+      const addressHex = address.toLowerCase().startsWith('0x') ? address.slice(2) : address
+      const addressBigInt = BigInt('0x' + addressHex)
+      
+      client.reducers.submitGuess(
         BigInt(roundId),
-        BigInt(fidNum),
+        addressBigInt,
         username,
         BigInt(guess),
         pfpUrl || undefined
       )
-
+      
       console.log('✅ [REALTIME] Guess submitted!')
       return true
     } catch (error) {
@@ -698,7 +559,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     try {
-      await (client as any).reducers.endRoundManually(BigInt(roundId))
+      client.reducers.endRoundManually(BigInt(roundId))
       console.log('✅ [REALTIME] Round ended!')
       return true
     } catch (error) {
@@ -717,20 +578,15 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       throw new Error('Not connected to database')
     }
     
-    // Expect fid-based winner address
-    if (!winningAddress.startsWith('fid-')) {
-      throw new Error('Winner address must be FID-based (fid-<number>)')
-    }
-    const fidNum = Number(winningAddress.slice(4))
-    if (!Number.isFinite(fidNum) || fidNum <= 0) {
-      throw new Error('Invalid winner FID')
-    }
-
-    await (client as any).reducers.updateRoundResult(
+    // Convert hex address to BigInt (remove 0x prefix first)
+    const addressHex = winningAddress.toLowerCase().startsWith('0x') ? winningAddress.slice(2) : winningAddress
+    const winningAddressBigInt = BigInt('0x' + addressHex)
+    
+    client.reducers.updateRoundResult(
       BigInt(roundId),
       BigInt(actualTxCount),
       blockHash,
-      BigInt(fidNum)
+      winningAddressBigInt
     )
     
     console.log('✅ [REALTIME] Round result updated!')
@@ -756,7 +612,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     try {
       console.log('📤 [REALTIME] Sending chat message...')
       
-      await (client as any).reducers.sendChatMessage(
+      client.reducers.sendChatMessage(
         message.roundId,
         message.address,
         message.username,
@@ -771,7 +627,20 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
   }, [client, connected])
 
-  // NOTE: Removed client-side auto-close timer; server tick_rounds is the source of truth
+  // Auto-close rounds when end time is reached
+  useEffect(() => {
+    if (!activeRound || !client || !connected) return
+
+    const checkRoundEnd = (): void => {
+      const now = Date.now()
+      if (activeRound.status === 'open' && now >= activeRound.endTime) {
+        endRound(activeRound.id).catch(console.error)
+      }
+    }
+
+    const interval = setInterval(checkRoundEnd, 1000)
+    return () => clearInterval(interval)
+  }, [activeRound, client, connected, endRound])
 
   // Check-in function
   const checkIn = useCallback(async (
@@ -786,10 +655,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     try {
       console.log('📝 [REALTIME] Performing check-in...', { userIdentifier, username })
       
-      if (!('dailyCheckin' in ((client as any).reducers as any))) {
-        return { success: false, error: 'Check-in not available on this deployment' }
-      }
-      await ((client as any).reducers as any).dailyCheckin(userIdentifier, username, pfpUrl)
+      client.reducers.dailyCheckin(userIdentifier, username, pfpUrl)
       
       console.log('✅ [REALTIME] Check-in successful!')
       
@@ -822,10 +688,6 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     addChatMessage,
     connected,
     client,
-    settings,
-    getSetting,
-    getInt,
-    getBool,
     checkIn,
     userStats,
     hasCheckedInToday,

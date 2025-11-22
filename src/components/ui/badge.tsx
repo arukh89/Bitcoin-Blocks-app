@@ -1,21 +1,6 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import * as React from 'react'
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: "default" | "outline" | "secondary"
-}
-
-export const Badge = ({ className, variant = "default", ...props }: BadgeProps) => {
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
-        variant === "default" && "bg-primary text-primary-foreground",
-        variant === "outline" && "text-foreground",
-        variant === "secondary" && "bg-secondary text-secondary-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
+export function Badge({ className, children, variant }: React.PropsWithChildren<{ className?: string; variant?: 'outline' | 'default' }>): JSX.Element {
+  const base = 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs'
+  return <span className={`${base} ${className || ''}`}>{children}</span>
 }

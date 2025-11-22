@@ -85,7 +85,7 @@ export function LoadingScreen(): JSX.Element {
           <h1 className="text-5xl font-bold text-white mb-2">
             Bitcoin Blocks
           </h1>
-          <p className="text-orange-300 text-lg">Predicting Bitcoin’s Future</p>
+          <p className="text-orange-300 text-lg">Predicting Bitcoin&apos;s Future</p>
         </motion.div>
 
         {/* Progress bar */}

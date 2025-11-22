@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -7,25 +7,21 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useGame } from '@/context/GameContext'
-import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 
 export function GuessForm(): JSX.Element {
-  const { activeRound, submitGuess, hasUserGuessed, connected, getGuessesForRound, getInt, getBool } = useGame()
-  const { user } = useAuth()
+  const { user, activeRound, submitGuess, hasUserGuessed, connected, getGuessesForRound } = useGame()
   const { toast } = useToast()
   const [guess, setGuess] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
 
   // Get user's guesses for active round
-  const userGuesses = activeRound
+  const userGuesses = activeRound 
     ? getGuessesForRound(activeRound.id).filter(g => user && g.address.toLowerCase() === user.address.toLowerCase())
     : []
 
   const isRoundLocked = activeRound?.status !== 'open'
   const alreadyGuessed = user && activeRound ? hasUserGuessed(activeRound.id, user.address) : false
-  const requireFid = getBool('require_fid_for_guess', true)
-  const isFidUser = !!user && (!requireFid || user.address.startsWith('fid-'))
 
   // Debug logging
   useEffect(() => {
@@ -37,10 +33,9 @@ export function GuessForm(): JSX.Element {
       roundStatus: activeRound?.status,
       isRoundLocked,
       alreadyGuessed,
-      userGuessesCount: userGuesses.length,
-      isFidUser
+      userGuessesCount: userGuesses.length
     })
-  }, [user, connected, activeRound, isRoundLocked, alreadyGuessed, userGuesses.length, isFidUser])
+  }, [user, connected, activeRound, isRoundLocked, alreadyGuessed, userGuesses.length])
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -49,16 +44,6 @@ export function GuessForm(): JSX.Element {
       toast({
         title: '🔐 Authentication Required',
         description: 'Please sign in with Farcaster first',
-        variant: 'destructive'
-      })
-      return
-    }
-
-    // Enforce FID-only guessing (Farcaster login)
-    if (!isFidUser) {
-      toast({
-        title: '🔒 Farcaster Required',
-        description: 'Please sign in with Farcaster to submit a guess',
         variant: 'destructive'
       })
       return
@@ -82,13 +67,11 @@ export function GuessForm(): JSX.Element {
       return
     }
 
-    const min = getInt('guess_min', 1)
-    const max = getInt('guess_max', 20000)
     const guessNum = parseInt(guess, 10)
-    if (isNaN(guessNum) || guessNum < min || guessNum > max || guess.includes('.') || guess.includes(',')) {
+    if (isNaN(guessNum) || guessNum < 1 || guessNum > 20000 || guess.includes('.') || guess.includes(',')) {
       toast({
         title: '⚠️ Invalid Input',
-        description: `Enter a number between ${min} and ${max} — no decimals, no text`,
+        description: 'Enter a number between 1 and 20,000 — no decimals, no text',
         variant: 'destructive'
       })
       return
@@ -149,21 +132,14 @@ export function GuessForm(): JSX.Element {
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="guess" className="text-gray-300 text-sm font-semibold">🎯 Your Prediction</Label>
+            <Label className="text-gray-300 text-sm font-semibold">🎯 Your Prediction</Label>
             <Input
               type="number"
-              id="guess"
-              name="guess"
-              placeholder={!user ? "Sign in to predict..." : !activeRound ? "Waiting for round..." : `Enter tx count (${getInt('guess_min', 1)}-${getInt('guess_max', 20000)})`}
+              placeholder={!user ? "Sign in to predict..." : !activeRound ? "Waiting for round..." : "Enter tx count (1-20,000)"}
               value={guess}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuess(e.target.value)}
-              disabled={loading || isRoundLocked || !connected || !user || !activeRound || alreadyGuessed || !isFidUser}
+              disabled={loading || isRoundLocked || !connected || !user || !activeRound || alreadyGuessed}
               required
-              min={getInt('guess_min', 1)}
-              max={getInt('guess_max', 20000)}
-              step={1}
-              inputMode="numeric"
-              pattern="[0-9]*"
               className="h-14 text-lg font-bold text-center bg-gray-800/50 border-2 border-orange-500/50 text-white placeholder:text-gray-500 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/50 transition-all"
             />
           </div>
@@ -187,15 +163,6 @@ export function GuessForm(): JSX.Element {
               <p className="text-2xl mb-2">🔒</p>
               <p className="text-gray-300 text-sm font-medium">Sign in with Farcaster to participate</p>
             </motion.div>
-          ) : !isFidUser ? (
-            <motion.div
-              className="glass-card p-4 rounded-xl text-center border border-purple-500/30"
-              animate={{ opacity: [0.7, 1, 0.7] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <p className="text-2xl mb-2">🟣</p>
-              <p className="text-purple-300 text-sm font-medium">Farcaster login required to guess</p>
-            </motion.div>
           ) : !activeRound ? (
             <motion.div
               className="glass-card p-4 rounded-xl text-center border border-yellow-500/30"
@@ -211,13 +178,13 @@ export function GuessForm(): JSX.Element {
               <Button 
                 type="submit" 
                 className="w-full h-12 text-base font-bold bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={loading || isRoundLocked || !connected || alreadyGuessed || !isFidUser}
+                disabled={loading || isRoundLocked || !connected || alreadyGuessed}
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <motion.span
                       animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     >
                       ⚙️
                     </motion.span>

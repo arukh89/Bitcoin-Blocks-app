@@ -3,15 +3,17 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 
-import { SignInButton } from '@/components/SignInButton'
+import { AuthButton } from '@/components/AuthButton'
 import { GlobalChat } from '@/components/GlobalChat'
 import { AdminPanel } from '@/components/AdminPanel'
+import { Countdown } from '@/components/Countdown'
 import { GuessForm } from '@/components/GuessForm'
 import { Leaderboard } from '@/components/Leaderboard'
 import { AllPredictions } from '@/components/AllPredictions'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { AnimatedBackground } from '@/components/AnimatedBackground'
 import { RecentBlocks } from '@/components/RecentBlocks'
+import { DatabaseStatusBanner } from '@/components/DatabaseStatusBanner'
 import { CurrentRound } from '@/components/CurrentRound'
 import PrizesAndRulesSection from '@/components/PrizesAndRulesSection'
 import { DailyCheckIn } from '@/components/DailyCheckIn'
@@ -21,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
 import { useAuth } from '@/context/AuthContext'
-import sdk from "@farcaster/miniapp-sdk"
+import { sdk } from "@farcaster/miniapp-sdk"
 import { useAddMiniApp } from "@/hooks/useAddMiniApp";
 import { useQuickAuth } from "@/hooks/useQuickAuth";
 import { useIsInFarcaster } from "@/hooks/useIsInFarcaster";
@@ -30,7 +32,7 @@ export default function Home(): JSX.Element {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false)
-  const { activeRound, getGuessesForRound, connected, prizeConfig, getSetting } = useGame()
+  const { activeRound, getGuessesForRound, connected, prizeConfig } = useGame()
   const { user } = useAuth()
     const { addMiniApp } = useAddMiniApp();
     const isInFarcaster = useIsInFarcaster()
@@ -90,9 +92,6 @@ export default function Home(): JSX.Element {
   }, [])
 
   const participantCount = activeRound ? getGuessesForRound(activeRound.id).length : 0
-  const jackpotText = prizeConfig
-    ? `${Number(prizeConfig.jackpotAmount).toLocaleString()} ${prizeConfig.currencyType}`
-    : `${(Number(getSetting('jackpot_default', '5000')) || 5000).toLocaleString()} ${getSetting('default_currency', '$Seconds')}`
 
   return (
     <>
@@ -150,11 +149,11 @@ export default function Home(): JSX.Element {
                   >
                     🛠️
                   </span>
-                  {getSetting('homepage_title', 'Bitcoin Blocks')}
+                  Bitcoin Blocks
                 </motion.h1>
                 <p className="text-orange-300 text-sm font-medium flex items-center gap-2">
                   <span className="inline-block w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
-                  {getSetting("homepage_tagline", "Predicting Bitcoin’s Next Block")}
+                  Predicting Bitcoin&apos;s Next Block
                 </p>
               </div>
               
@@ -177,7 +176,7 @@ export default function Home(): JSX.Element {
                     {connected ? 'Connected' : 'Disconnected'}
                   </Badge>
                 </motion.div>
-                <SignInButton />
+                <AuthButton />
               </div>
             </motion.div>
 
@@ -206,7 +205,7 @@ export default function Home(): JSX.Element {
                     }}
                     transition={{ duration: 2, repeat: Infinity }}
                   >
-                    {jackpotText}
+                    {prizeConfig ? `${Number(prizeConfig.jackpotAmount).toLocaleString()} ${prizeConfig.currencyType}` : '5,000 $SECOND'}
                   </motion.p>
                 </CardContent>
               </Card>
@@ -214,9 +213,9 @@ export default function Home(): JSX.Element {
 
             {/* Prizes and Rules Section - Combined */}
             <PrizesAndRulesSection 
-              firstPrize={prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : 'N/A'}
-              secondPrize={prizeConfig ? Number(prizeConfig.secondPlaceAmount).toLocaleString() : 'N/A'}
-              currency={prizeConfig?.currencyType || getSetting('default_currency', '$Seconds') || '$Seconds'}
+              firstPrize={prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : '1,000'}
+              secondPrize={prizeConfig ? Number(prizeConfig.secondPlaceAmount).toLocaleString() : '500'}
+              currency={prizeConfig?.currencyType || '$SECOND'}
             />
 
             {/* Current Round - New Simplified Design */}

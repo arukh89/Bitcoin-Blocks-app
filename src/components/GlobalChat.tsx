@@ -8,13 +8,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
-import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import type { ChatMessage } from '@/types/game'
 
 export function GlobalChat(): JSX.Element {
-  const { activeRound, chatMessages, addChatMessage, connected } = useGame()
-  const { user } = useAuth()
+  const { user, activeRound, chatMessages, addChatMessage } = useGame()
   const { toast } = useToast()
   const [message, setMessage] = useState<string>('')
   const [sending, setSending] = useState<boolean>(false)
@@ -60,10 +58,6 @@ export function GlobalChat(): JSX.Element {
               e.preventDefault()
               
               if (!message.trim()) return
-              if (!connected) {
-                toast({ title: 'Not connected', description: 'Please wait for DB connection', variant: 'destructive' })
-                return
-              }
               
               if (message.length > 200) {
                 toast({
@@ -86,7 +80,7 @@ export function GlobalChat(): JSX.Element {
                   timestamp: Date.now(),
                   type: 'chat'
                 }
-                await addChatMessage(chatMsg)
+                addChatMessage(chatMsg)
                 setMessage('')
                 toast({
                   title: '✅ Message Sent',
@@ -95,7 +89,7 @@ export function GlobalChat(): JSX.Element {
               } catch (error) {
                 toast({
                   title: '❌ Send Failed',
-                  description: String(error),
+                  description: 'Could not send message',
                   variant: 'destructive'
                 })
               } finally {
@@ -107,13 +101,13 @@ export function GlobalChat(): JSX.Element {
                 placeholder="Type a message..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                disabled={!connected || sending}
+                disabled={sending}
                 maxLength={200}
                 className="h-10 text-sm bg-gray-800/50 border-cyan-500/50 text-white placeholder:text-gray-500"
               />
               <Button 
                 type="submit" 
-                disabled={!connected || !message.trim() || sending}
+                disabled={!message.trim() || sending}
                 className="h-10 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-sm"
               >
                 {sending ? '⚙️' : '📤'}

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -19,18 +19,16 @@ export function CurrentRound(): JSX.Element {
       try {
         const response = await fetch('/api/mempool?action=recent-blocks')
         if (!response.ok) return
-
-        const blocks = await response.json() as Array<{
-          height: number
-          timestamp: number
-          tx_count: number
-        }>
-
-        const latest = Array.isArray(blocks) && blocks.length > 0 ? blocks[0] : null
-        if (latest) {
-          setLastBlockTime(latest.timestamp * 1000) // Convert to milliseconds
-          setBlockNumber(latest.height)
-          setTxCount(latest.tx_count)
+        
+        const data = await response.json()
+        if (data.timestamp) {
+          setLastBlockTime(data.timestamp * 1000) // Convert to milliseconds
+        }
+        if (data.height) {
+          setBlockNumber(data.height)
+        }
+        if (data.tx_count) {
+          setTxCount(data.tx_count)
         }
       } catch (error) {
         console.error('Failed to fetch block data:', error)
@@ -90,9 +88,9 @@ export function CurrentRound(): JSX.Element {
   // Round number from admin input
   const roundNumber = activeRound?.roundNumber?.toString() || '—'
   
-  // Block number: Prioritize admin input, fallback to latest from mempool; else N/A
-  const displayBlockNumber: number | null = (activeRound?.blockNumber ?? blockNumber) ?? null
-  const displayTxCount: number | null = txCount ?? null
+  // Block number: Prioritize admin input, fallback to latest from mempool
+  const displayBlockNumber = activeRound?.blockNumber || blockNumber || 875420
+  const displayTxCount = txCount || 0
 
   // If not connected, show connecting state
   if (!connected) {
@@ -189,9 +187,9 @@ export function CurrentRound(): JSX.Element {
                 <div className="text-center space-y-1">
                   <p className="text-[10px] lg:text-xs text-blue-300 font-semibold">🧱 Target Block</p>
                   <p className="text-xl lg:text-2xl font-black text-blue-400 font-mono">
-                    {displayBlockNumber !== null ? `#${displayBlockNumber.toLocaleString()}` : 'N/A'}
+                    #{displayBlockNumber.toLocaleString()}
                   </p>
-                  <p className="text-[9px] lg:text-[10px] text-gray-400">Txs: {displayTxCount !== null ? displayTxCount.toLocaleString() : 'N/A'}</p>
+                  <p className="text-[9px] lg:text-[10px] text-gray-400">Txs: {displayTxCount.toLocaleString()}</p>
                 </div>
               </div>
 

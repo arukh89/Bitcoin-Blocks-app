@@ -1,29 +1,19 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import sdk from '@farcaster/miniapp-sdk'
+import { sdk } from '@farcaster/miniapp-sdk'
 import type { User } from '@/types/game'
 
-// Admin Farcaster FIDs
-export const ADMIN_FIDS = [
-  250704,  // ukhy89
-  1107084  // miggles.eth
-]
+// Admin Farcaster FIDs (no hardcode). Provide CSV in env: NEXT_PUBLIC_ADMIN_FIDS="123,456"
+const ADMIN_FIDS: number[] = (process.env.NEXT_PUBLIC_ADMIN_FIDS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
+  .map(n => Number(n))
+  .filter(n => Number.isFinite(n))
 
 export function isAdminFid(fid: number): boolean {
   return ADMIN_FIDS.includes(fid)
-}
-
-// Admin Wallet Addresses (lowercased)
-export const ADMIN_WALLETS: string[] = [
-  '0x09d02d25d0d082f7f2e04b4838cefe271b2dab09',
-  '0xc38b1633e152fc75da3ff737717c0da5ef291408'
-]
-
-export function isAdminWallet(address: string): boolean {
-  if (!address) return false
-  const a = address.toLowerCase()
-  return ADMIN_WALLETS.includes(a)
 }
 
 export type AuthMode = 'farcaster-sdk' | 'neynar' | 'wallet'
@@ -34,10 +24,9 @@ interface AuthContextType {
   authMode: AuthMode | null
   isAuthenticated: boolean
   isInFarcaster: boolean
-  signInWithNeynar: (profile?: { fid?: number, username?: string | null, displayName?: string | null, pfpUrl?: string | null }) => Promise<void>
+  signInWithNeynar: () => Promise<void>
   signInWithWallet: (address: string) => Promise<void>
   signOut: () => void
-  logout: () => void
   walletAddress: string | null
   walletChain: 'base' | 'arbitrum' | null
   setWalletChain: (chain: 'base' | 'arbitrum') => void
@@ -102,29 +91,17 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   // ===========================================
   // NEYNAR SIGN IN (Web Context)
   // ===========================================
-  const signInWithNeynar = useCallback(async (profile?: { fid?: number, username?: string | null, displayName?: string | null, pfpUrl?: string | null }): Promise<void> => {
+  const signInWithNeynar = useCallback(async (): Promise<void> => {
     try {
-      console.log('🔐 Farcaster web auth (AuthKit) start')
-      if (profile && profile.fid) {
-        const fid = profile.fid
-        const isAdmin = isAdminFid(fid)
-        const fcUser: User = {
-          address: `fid-${fid}`,
-          username: (profile.username || profile.displayName || `user${fid}`) ?? `user${fid}`,
-          displayName: (profile.displayName || profile.username || `user${fid}`) ?? `user${fid}`,
-          pfpUrl: profile.pfpUrl || 'https://i.imgur.com/placeholder.jpg',
-          isAdmin
-        }
-        setUser(fcUser)
-        setUserFid(fid)
-        setAuthMode('neynar')
-        console.log('✅ Farcaster web auth success:', { fid, isAdmin })
-        return
-      }
-      // If no profile provided, just mark intent; UI should call again with profile data
+      console.log('🔐 Starting Neynar authentication...')
+      
+      // Generate auth URL and redirect
+      // This will be implemented in SignInButton component
+      // using @neynar/react SDK
+      
       setAuthMode('neynar')
     } catch (error) {
-      console.error('❌ Farcaster web auth failed:', error)
+      console.error('❌ Neynar auth failed:', error)
       throw error
     }
   }, [])
@@ -142,8 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         username: `${address.slice(0, 6)}...${address.slice(-4)}`,
         displayName: `${address.slice(0, 6)}...${address.slice(-4)}`,
         pfpUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
-        // Wallet admins can access Admin UI; announcements remain FID-only in UI logic
-        isAdmin: isAdminWallet(address)
+        isAdmin: false
       }
       
       setUser(walletUser)
@@ -170,10 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     console.log('👋 User signed out')
   }, [])
 
-  const logout = useCallback((): void => {
-    signOut()
-  }, [signOut])
-
   const value: AuthContextType = {
     user,
     userFid,
@@ -183,7 +155,6 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     signInWithNeynar,
     signInWithWallet,
     signOut,
-    logout,
     walletAddress,
     walletChain,
     setWalletChain

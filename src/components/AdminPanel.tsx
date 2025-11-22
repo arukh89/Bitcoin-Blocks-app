@@ -7,15 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { useGame } from '@/context/GameContext'
-import type { ChatMessage } from '@/types/game'
-import { useAuth } from '@/context/AuthContext'
+import { useGame } from '@/AuthContext/GameContext'
 import { useToast } from '@/hooks/use-toast'
 // Removed APP_CONFIG - using pure realtime mode
 
 export function AdminPanel(): JSX.Element {
-  const { createRound, endRound, updateRoundResult, activeRound, rounds, getGuessesForRound, connected, client, prizeConfig, addChatMessage, getSetting, getInt, getBool } = useGame()
-  const { user } = useAuth()
+  const { user, createRound, endRound, updateRoundResult, activeRound, rounds, getGuessesForRound, connected, client, prizeConfig } = useGame()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
   const [checkingBlock, setCheckingBlock] = useState<boolean>(false)
@@ -28,7 +25,7 @@ export function AdminPanel(): JSX.Element {
   const [jackpotAmount, setJackpotAmount] = useState<string>('')
   const [firstPrize, setFirstPrize] = useState<string>('')
   const [secondPrize, setSecondPrize] = useState<string>('')
-  const [prizeCurrency, setPrizeCurrency] = useState<string>('$Seconds')
+  const [prizeCurrency, setPrizeCurrency] = useState<string>('')
 
   // Load saved prize config on mount
   useEffect(() => {
@@ -36,15 +33,15 @@ export function AdminPanel(): JSX.Element {
       setJackpotAmount(String(prizeConfig.jackpotAmount))
       setFirstPrize(String(prizeConfig.firstPlaceAmount))
       setSecondPrize(String(prizeConfig.secondPlaceAmount))
-      setPrizeCurrency(prizeConfig.currencyType || '$Seconds')
+      setPrizeCurrency(prizeConfig.currencyType)
     } else {
       // Set defaults if no config exists
       setJackpotAmount('5000')
       setFirstPrize('1000')
       setSecondPrize('500')
-      setPrizeCurrency(getSetting('default_currency', '$Seconds') || '$Seconds')
+      setPrizeCurrency('$SECOND')
     }
-  }, [prizeConfig, getSetting])
+  }, [prizeConfig])
 
   // Only show to admin users (check already done in parent, but double-check for safety)
   if (!user?.isAdmin) {
@@ -135,14 +132,10 @@ export function AdminPanel(): JSX.Element {
       setLoading(true)
       await createRound(roundNum, now, endTime, prize, blockNum, durationMin)
       
-      // Announce to Global Chat using template
-      const tpl = getSetting('announce_template_round_start', '🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m') || '🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m'
-      const msg = tpl
-        .replace('{round}', String(roundNum))
-        .replace('{jackpot}', `${jackpotAmount} ${prizeCurrency}`)
-        .replace('{block}', `#${blockNum}`)
-        .replace('{duration}', String(durationMin))
-      await handleAnnounce(msg)
+      // Auto-post to Farcaster
+      const farcasterPrize = `${jackpotAmount} ${prizeCurrency}`
+      const message = `🔔 Round #${roundNum} Started!\n\nGuess how many transactions will be in the next Bitcoin block ⛏️\n\n💰 Jackpot: ${farcasterPrize}\n🎯 Target Block: #${blockNum}\n⏱ Duration: ${durationMin} minutes\n\n#BitcoinBlocks`
+      await handleAnnounce(message)
       
       toast({
         title: '✅ Round Started',
@@ -240,25 +233,22 @@ export function AdminPanel(): JSX.Element {
     try {
       setLoading(true)
       
-      // Fetch from internal mempool API
-      // 1) Try recent blocks then locate by height
-      const recentRes = await fetch('/api/mempool?action=recent-blocks')
-      if (!recentRes.ok) {
-        throw new Error('Failed to fetch recent blocks')
+      // Fetch from mempool.space
+      const blockRes = await fetch(`/api/mempool?action=block-hash&height=${closedRound.blockNumber}`)
+
+      if (!blockRes.ok) {
+        throw new Error(`Block #${closedRound.blockNumber} not found yet. Try again later.`)
       }
-      const recentBlocks = await recentRes.json() as Array<{ height: number, hash: string }>
-      const found = recentBlocks.find(b => b.height === closedRound.blockNumber)
-      if (!found) {
-        throw new Error(`Block #${closedRound.blockNumber} not found in recent blocks. Try again later.`)
-      }
-      const blockHash = found.hash
+
+      const blockHash = await blockRes.text() as string
 
       const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
+
       if (!txRes.ok) {
-        throw new Error('Failed to fetch transaction count')
+        throw new Error('Failed to fetch transactions from mempool.space')
       }
-      const { txCount } = await txRes.json() as { txCount: number }
-      const actualTxCount = txCount
+
+      const { txCount: actualTxCount } = await txRes.json() as { txCount: number }
 
       // Find winners
       const guesses = getGuessesForRound(closedRound.id)
@@ -278,17 +268,15 @@ export function AdminPanel(): JSX.Element {
 
       await updateRoundResult(closedRound.id, actualTxCount, blockHash, winner.address)
 
-      // Announce results using template
-      const tpl = getSetting('announce_template_results', '📊 Block #{block} had {txCount} txs. 🥇 @{winner}') || '📊 Block #{block} had {txCount} txs. 🥇 @{winner}'
-      const message = tpl
-        .replace('{block}', `#${closedRound.blockNumber}`)
-        .replace('{txCount}', actualTxCount.toLocaleString())
-        .replace('{winner}', winner.username)
+      // Auto-post results to Farcaster
+      const newJackpot = `${jackpotAmount} ${prizeCurrency}`
+      const message = `📊 Block #${closedRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\n\n🥇 Winner: @${winner.username}\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\n\n💰 Jackpot is now: ${newJackpot}\n\n#BitcoinBlocks`
+      
       await handleAnnounce(message)
 
       toast({
         title: '🎉 Results Posted!',
-        description: `Winner: @${winner.username} - announced in Global Chat`
+        description: `Winner: @${winner.username} - announced on Farcaster`
       })
     } catch (error) {
       toast({
@@ -308,21 +296,20 @@ export function AdminPanel(): JSX.Element {
     }
 
     try {
-      // Gate by FID-only depending on setting (default true)
-      const requiresFid = getBool('admin_announce_requires_fid', true)
-      if (requiresFid && !user.address.startsWith('fid-')) return
+        const response = await fetch('/api/farcaster-announce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          address: user.address
+        })
+      })
 
-      const chatMsg: ChatMessage = {
-        id: `sys-${Date.now()}`,
-        roundId: 'global',
-        address: user.address,
-        username: user.username,
-        message,
-        pfpUrl: user.pfpUrl,
-        timestamp: Date.now(),
-        type: 'system'
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to announce')
       }
-      await addChatMessage(chatMsg)
     } catch (error) {
       console.error('Announcement error:', error)
     }
@@ -383,11 +370,12 @@ export function AdminPanel(): JSX.Element {
       setLoading(true)
       
       // Convert to BigInt for SpacetimeDB
-      await (client as any).reducers.savePrizeConfig(
+      client.reducers.savePrizeConfig(
         BigInt(Math.floor(jackpotNum)),
         BigInt(Math.floor(firstNum)),
         BigInt(Math.floor(secondNum)),
-        prizeCurrency.trim()
+        prizeCurrency.trim(),
+        '' // tokenContractAddress - empty for now
       )
 
       toast({
@@ -405,19 +393,17 @@ export function AdminPanel(): JSX.Element {
     }
   }
 
-  // Poll mempool (via internal API) to check if target block is available
+  // Poll mempool.space to check if target block is available
   const pollForTargetBlock = async (targetBlock: number): Promise<void> => {
     setCheckingBlock(true)
     setBlockAvailable(false)
     
     const checkBlock = async (): Promise<boolean> => {
       try {
-        const response = await fetch('/api/mempool?action=recent-blocks')
-        if (!response.ok) return false
-        const blocks = await response.json() as Array<{ height: number }>
-        const exists = blocks.some(b => b.height === targetBlock)
-        if (exists) {
-          console.log(`✅ Block #${targetBlock} is now available (recent-blocks)!`)
+        const response = await fetch(`/api/mempool?action=block-hash&height=${targetBlock}`)
+        
+        if (response.ok) {
+          console.log(`✅ Block #${targetBlock} is now available on mempool.space!`)
           return true
         }
         return false
@@ -427,8 +413,7 @@ export function AdminPanel(): JSX.Element {
       }
     }
     
-    // Poll interval from settings (seconds)
-    const pollSec = Math.max(5, getInt('admin_poll_interval_seconds', 30))
+    // Poll every 30 seconds
     const interval = setInterval(async () => {
       if (!activeRound || activeRound.status !== 'open') {
         clearInterval(interval)
@@ -462,7 +447,7 @@ export function AdminPanel(): JSX.Element {
           }, 2000)
         }
       }
-    }, pollSec * 1000)
+    }, 30000) // Check every 30 seconds
     
     // Initial check
     const available = await checkBlock()
@@ -509,15 +494,13 @@ export function AdminPanel(): JSX.Element {
                 <span className="text-xl">🚀</span>
                 <h3 className="text-base font-bold text-white">Start New Round</h3>
               </div>
-              <p className="text-xs text-gray-400">Opens new round for guesses & auto-announces in Global Chat</p>
+              <p className="text-xs text-gray-400">Opens new round for guesses & auto-posts to Farcaster</p>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="roundNumber" className="text-gray-300 text-sm font-bold">🔢 Round Number <span className="text-gray-500 font-normal text-xs">(sequential: 1, 2, 3...)</span></Label>
+                  <Label className="text-gray-300 text-sm font-bold">🔢 Round Number <span className="text-gray-500 font-normal text-xs">(sequential: 1, 2, 3...)</span></Label>
                   <Input
                     type="number"
-                    id="roundNumber"
-                    name="roundNumber"
                     placeholder="Enter: 1, 2, 3, 4, 5... (NOT block number!)"
                     value={roundNumber}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRoundNumber(e.target.value)}
@@ -527,11 +510,9 @@ export function AdminPanel(): JSX.Element {
                   <p className="text-[10px] text-green-400">✅ Example: Round 1, Round 2, Round 3</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="blockNumber" className="text-gray-300 text-sm font-bold">🧱 Target Block Number <span className="text-gray-500 font-normal text-xs">(from mempool.space)</span></Label>
+                  <Label className="text-gray-300 text-sm font-bold">🧱 Target Block Number <span className="text-gray-500 font-normal text-xs">(from mempool.space)</span></Label>
                   <Input
                     type="number"
-                    id="blockNumber"
-                    name="blockNumber"
                     placeholder="Enter: 919185, 875420... (Bitcoin block height)"
                     value={blockNumber}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBlockNumber(e.target.value)}
@@ -541,11 +522,9 @@ export function AdminPanel(): JSX.Element {
                   <p className="text-[10px] text-cyan-400">✅ Example: Block #919185 (6-digit number)</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="duration" className="text-gray-300 text-sm font-bold">⏱ Round Duration <span className="text-gray-500 font-normal text-xs">(in minutes)</span></Label>
+                  <Label className="text-gray-300 text-sm font-bold">⏱ Round Duration <span className="text-gray-500 font-normal text-xs">(in minutes)</span></Label>
                   <Input
                     type="number"
-                    id="duration"
-                    name="duration"
                     placeholder="e.g., 10, 15, 30 minutes"
                     value={duration}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDuration(e.target.value)}
@@ -563,12 +542,6 @@ export function AdminPanel(): JSX.Element {
               >
                 {loading ? '⚙️ Starting...' : !connected ? '🔌 Connecting...' : '🔔 Start Round & Announce'}
               </Button>
-              {/* Hint when announcements require FID but admin is not FID */}
-              {getBool('admin_announce_requires_fid', true) && user && !user.address.startsWith('fid-') && (
-                <p className="text-[10px] text-red-400 mt-2 text-center">
-                  🔒 Announcements require Farcaster login (FID). Set <span className="font-mono">admin_announce_requires_fid = false</span> in Site Settings to allow wallet-only.
-                </p>
-              )}
               {!connected && (
                 <p className="text-xs text-red-400 mt-2 text-center">
                   ⚠️ Waiting for database connection...
@@ -660,10 +633,8 @@ export function AdminPanel(): JSX.Element {
                   disabled={loading || !connected || !rounds.find(r => r.status === 'closed')}
                   className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold h-12 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? '⚙️' : '📡'}
-                  <span className="ml-1 text-xs">
-                    {loading ? 'Fetching...' : 'Post Results'}
-                  </span>
+              {loading ? '⚙️' : '📡'}
+                  <span className="ml-1 text-xs">{loading ? 'Fetching...' : 'Post Results'}</span>
                 </Button>
               </div>
               
@@ -690,11 +661,9 @@ export function AdminPanel(): JSX.Element {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="jackpotAmount" className="text-gray-300 text-sm">Jackpot Amount</Label>
+                    <Label className="text-gray-300 text-sm">Jackpot Amount</Label>
                     <Input
                       type="text"
-                      id="jackpotAmount"
-                      name="jackpotAmount"
                       placeholder="5000 (enter numbers only)"
                       value={jackpotAmount}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJackpotAmount(e.target.value)}
@@ -706,11 +675,9 @@ export function AdminPanel(): JSX.Element {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstPrize" className="text-gray-300 text-sm">1st Place Prize</Label>
+                    <Label className="text-gray-300 text-sm">1st Place Prize</Label>
                     <Input
                       type="text"
-                      id="firstPrize"
-                      name="firstPrize"
                       placeholder="1000"
                       value={firstPrize}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFirstPrize(e.target.value)}
@@ -718,11 +685,9 @@ export function AdminPanel(): JSX.Element {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="secondPrize" className="text-gray-300 text-sm">2nd Place Prize</Label>
+                    <Label className="text-gray-300 text-sm">2nd Place Prize</Label>
                     <Input
                       type="text"
-                      id="secondPrize"
-                      name="secondPrize"
                       placeholder="500"
                       value={secondPrize}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSecondPrize(e.target.value)}
@@ -733,12 +698,10 @@ export function AdminPanel(): JSX.Element {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="prizeCurrency" className="text-gray-300 text-sm">Prize Currency</Label>
+                <Label className="text-gray-300 text-sm">Prize Currency</Label>
                 <Input
                   type="text"
-                  id="prizeCurrency"
-                  name="prizeCurrency"
-                  placeholder="$Seconds"
+                  placeholder="$SECOND, USDC, ETH"
                   value={prizeCurrency}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency(e.target.value)}
                   className="bg-gray-800/50 border-gray-600/50 text-white"
@@ -765,63 +728,8 @@ export function AdminPanel(): JSX.Element {
           {/* Info Note */}
           <div className="glass-card-dark p-4 rounded-xl border border-cyan-500/30">
             <p className="text-sm text-cyan-300">
-              <span className="font-bold">ℹ️ Auto-Announcement:</span> Starting rounds and posting results will automatically announce in Global Chat with formatted messages.
+              <span className="font-bold">ℹ️ Auto-Announcement:</span> Starting rounds and posting results will automatically announce on Farcaster with formatted messages.
             </p>
-          </div>
-
-          {/* Site Settings */}
-          <div className="glass-card p-6 rounded-2xl space-y-4 border border-amber-500/30">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">⚙️</span>
-              <h3 className="text-base font-bold text-white">Site Settings</h3>
-            </div>
-            <p className="text-xs text-gray-400">Edit dynamic texts and rules. Changes apply live.</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="homepage_title" className="text-gray-300 text-sm">Homepage Title</Label>
-                <Input id="homepage_title" name="homepage_title" defaultValue={getSetting('homepage_title', 'Bitcoin Blocks')} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('homepage_title', e.target.value.trim()); toast({ title: 'Saved', description: 'homepage_title updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-              <div>
-                <Label htmlFor="homepage_tagline" className="text-gray-300 text-sm">Homepage Tagline</Label>
-                <Input id="homepage_tagline" name="homepage_tagline" defaultValue={getSetting('homepage_tagline', 'Predicting Bitcoin’s Next Block')} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('homepage_tagline', e.target.value.trim()); toast({ title: 'Saved', description: 'homepage_tagline updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-              <div>
-                <Label htmlFor="tpl_round_start" className="text-gray-300 text-sm">Start Template</Label>
-                <Input id="tpl_round_start" name="tpl_round_start" defaultValue={getSetting('announce_template_round_start', '🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m')} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('announce_template_round_start', e.target.value.trim()); toast({ title: 'Saved', description: 'announce_template_round_start updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-              <div>
-                <Label htmlFor="tpl_results" className="text-gray-300 text-sm">Results Template</Label>
-                <Input id="tpl_results" name="tpl_results" defaultValue={getSetting('announce_template_results', '📊 Block #{block} had {txCount} txs. 🥇 @{winner}')} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('announce_template_results', e.target.value.trim()); toast({ title: 'Saved', description: 'announce_template_results updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-              <div>
-                <Label htmlFor="admin_poll_interval_seconds" className="text-gray-300 text-sm">Admin Poll Interval (s)</Label>
-                <Input id="admin_poll_interval_seconds" name="admin_poll_interval_seconds" type="number" defaultValue={String(getInt('admin_poll_interval_seconds', 30))} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('admin_poll_interval_seconds', String(Math.max(5, parseInt(e.target.value || '30', 10)))); toast({ title: 'Saved', description: 'admin_poll_interval_seconds updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-              <div>
-                <Label htmlFor="guess_min" className="text-gray-300 text-sm">Guess Min</Label>
-                <Input id="guess_min" name="guess_min" type="number" defaultValue={String(getInt('guess_min', 1))} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('guess_min', String(parseInt(e.target.value || '1', 10))); toast({ title: 'Saved', description: 'guess_min updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-              <div>
-                <Label htmlFor="guess_max" className="text-gray-300 text-sm">Guess Max</Label>
-                <Input id="guess_max" name="guess_max" type="number" defaultValue={String(getInt('guess_max', 20000))} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('guess_max', String(parseInt(e.target.value || '20000', 10))); toast({ title: 'Saved', description: 'guess_max updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-              <div>
-                <Label htmlFor="require_fid_for_guess" className="text-gray-300 text-sm">Require FID for Guess</Label>
-                <div className="flex items-center gap-2">
-                  <input id="require_fid_for_guess" name="require_fid_for_guess" type="checkbox" defaultChecked={getBool('require_fid_for_guess', true)} onChange={async (e) => { await ((client as any)?.reducers)?.saveSetting('require_fid_for_guess', e.target.checked ? 'true' : 'false'); toast({ title: 'Saved', description: 'require_fid_for_guess updated' }) }} />
-                  <label htmlFor="require_fid_for_guess" className="text-xs text-gray-400">Farcaster-only guessing</label>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="checkin_base_points" className="text-gray-300 text-sm">Check-in Base Points</Label>
-                <Input id="checkin_base_points" name="checkin_base_points" type="number" defaultValue={String(getInt('checkin_base_points', 10))} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('checkin_base_points', String(parseInt(e.target.value || '10', 10))); toast({ title: 'Saved', description: 'checkin_base_points updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-              <div>
-                <Label htmlFor="checkin_streak_bonus_per_day" className="text-gray-300 text-sm">Check-in Streak Bonus / Day</Label>
-                <Input id="checkin_streak_bonus_per_day" name="checkin_streak_bonus_per_day" type="number" defaultValue={String(getInt('checkin_streak_bonus_per_day', 2))} onBlur={async (e) => { await ((client as any)?.reducers)?.saveSetting('checkin_streak_bonus_per_day', String(parseInt(e.target.value || '2', 10))); toast({ title: 'Saved', description: 'checkin_streak_bonus_per_day updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>

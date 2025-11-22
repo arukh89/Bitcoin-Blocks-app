@@ -9,27 +9,23 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { useGame, isDevAddress } from '@/context/GameContext'
-import type { ChatMessage } from '@/types/game'
-import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import { CheckInLeaderboard } from '@/components/CheckInLeaderboard'
 // Removed APP_CONFIG - using pure realtime mode
 
 export default function AdminPage(): JSX.Element {
   const router = useRouter()
-  const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected, addChatMessage } = useGame()
-  const { user } = useAuth()
+  const { user, createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected } = useGame()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
 
   // Form states
   const [blockNumber, setBlockNumber] = useState<string>('')
   const [jackpotAmount, setJackpotAmount] = useState<string>('5,000')
-  const [jackpotCurrency, setJackpotCurrency] = useState<string>('$Seconds')
+  const [jackpotCurrency, setJackpotCurrency] = useState<string>('$SECOND')
   const [firstPrize, setFirstPrize] = useState<string>('1,000')
   const [secondPrize, setSecondPrize] = useState<string>('500')
-  const [prizeCurrency, setPrizeCurrency] = useState<string>('$Seconds')
+  const [prizeCurrency, setPrizeCurrency] = useState<string>('$SECOND')
 
   // Redirect if not admin
   useEffect(() => {
@@ -75,14 +71,13 @@ export default function AdminPage(): JSX.Element {
     const now = Date.now()
     const endTime = now + (24 * 60 * 60 * 1000)
     const prize = `${jackpotAmount} ${jackpotCurrency}`
-    const nextRoundNumber = activeRound ? activeRound.roundNumber + 1 : 1
 
     try {
       setLoading(true)
-      await createRound(nextRoundNumber, now, endTime, prize, blockNum)
+      await createRound(now, endTime, prize, blockNum)
       
-      // Announce to Global Chat (FID only)
-      const message = `🔔 New Round Started!\n\nGuess how many transactions will be in the next Bitcoin block ⛏️\n\n💰 Jackpot: ${prize}\n🎯 Target Block: #${blockNum}\n\n#BitcoinBlocks`
+      // Auto-post to Farcaster
+      const message = `🔔 New Round Started!\\n\\nGuess how many transactions will be in the next Bitcoin block ⛏️\\n\\n💰 Jackpot: ${prize}\\n🎯 Target Block: #${blockNum}\\n\\n#BitcoinBlocks`
       await handleAnnounce(message)
       
       toast({
@@ -160,24 +155,43 @@ export default function AdminPage(): JSX.Element {
     try {
       setLoading(true)
       
-      // Fetch from internal mempool API
-      const recentRes = await fetch('/api/mempool?action=recent-blocks')
-      if (!recentRes.ok) {
-        throw new Error('Failed to fetch recent blocks')
-      }
-      const recentBlocks = await recentRes.json() as Array<{ height: number, hash: string }>
-      const found = recentBlocks.find(b => b.height === activeRound.blockNumber)
-      if (!found) {
-        throw new Error(`Block #${activeRound.blockNumber} not found in recent blocks. Try again later.`)
-      }
-      const blockHash = found.hash
+      // Fetch from mempool.space
+        const blockRes = await fetch('/api/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            protocol: 'https',
+            origin: 'mempool.space',
+            path: `/api/block-height/${activeRound.blockNumber}`,
+            method: 'GET',
+            headers: {}
+          })
+        })
 
-      const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
-      if (!txRes.ok) {
-        throw new Error('Failed to fetch transaction count')
-      }
-      const { txCount } = await txRes.json() as { txCount: number }
-      const actualTxCount = txCount
+        if (!blockRes.ok) {
+          throw new Error(`Block #${activeRound.blockNumber} not found yet. Try again later.`)
+        }
+
+        const blockHash = await blockRes.text() as string
+
+        const txRes = await fetch('/api/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            protocol: 'https',
+            origin: 'mempool.space',
+            path: `/api/block/${blockHash}/txids`,
+            method: 'GET',
+            headers: {}
+          })
+        })
+
+        if (!txRes.ok) {
+          throw new Error('Failed to fetch transactions from mempool.space')
+        }
+
+        const txids = await txRes.json() as string[]
+        const actualTxCount = txids.length
 
         // Find winners
         const guesses = getGuessesForRound(activeRound.id)
@@ -197,15 +211,15 @@ export default function AdminPage(): JSX.Element {
 
         await updateRoundResult(activeRound.id, actualTxCount, blockHash, winner.address)
 
-        // Announce results to Global Chat (FID only)
+        // Auto-post results to Farcaster
         const newJackpot = `${jackpotAmount} ${jackpotCurrency}`
-        const message = `📊 Block #${activeRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\n\n🥇 Winner: @${winner.username}\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\n\n💰 Jackpot is now: ${newJackpot}\n\n#BitcoinBlocks`
+        const message = `📊 Block #${activeRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\\n\\n🥇 Winner: @${winner.username}\\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\\n\\n💰 Jackpot is now: ${newJackpot}\\n\\n#BitcoinBlocks`
         
         await handleAnnounce(message)
 
       toast({
         title: '🎉 Results Posted!',
-        description: `Winner: @${winner.username} - announced in Global Chat`
+        description: `Winner: @${winner.username} - announced on Farcaster`
       })
     } catch (error) {
       toast({
@@ -220,21 +234,22 @@ export default function AdminPage(): JSX.Element {
 
   const handleAnnounce = async (message: string): Promise<void> => {
     if (!user || !isDevAddress(user.address)) return
-    // Only allow FID-based accounts to announce
-    if (!user.address.startsWith('fid-')) return
 
     try {
-      const chatMsg: ChatMessage = {
-        id: `sys-${Date.now()}`,
-        roundId: 'global',
-        address: user.address,
-        username: user.username,
-        message,
-        pfpUrl: user.pfpUrl,
-        timestamp: Date.now(),
-        type: 'system'
+      const response = await fetch('/api/farcaster-announce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          address: user.address
+        })
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to announce')
       }
-      await addChatMessage(chatMsg)
     } catch (error) {
       console.error('Announcement error:', error)
     }
@@ -344,7 +359,7 @@ export default function AdminPage(): JSX.Element {
                 <div>
                   <p className="text-white">Start New Round</p>
                   <p className="text-xs text-gray-400 font-normal mt-1">
-                    Opens new round for guesses & auto-announces in Global Chat
+                    Opens new round for guesses & auto-posts to Farcaster
                   </p>
                 </div>
               </CardTitle>
@@ -445,7 +460,7 @@ export default function AdminPage(): JSX.Element {
                   <div>
                     <p className="text-white">Post Results</p>
                     <p className="text-xs text-gray-400 font-normal mt-1">
-                      Pulls latest block data from mempool.space & posts formatted summary to Global Chat
+                      Pulls latest block data from mempool.space & posts formatted summary to Farcaster
                     </p>
                   </div>
                 </CardTitle>
@@ -504,10 +519,9 @@ export default function AdminPage(): JSX.Element {
                   <Label className="text-gray-300 text-sm">Jackpot Currency</Label>
                   <Input
                     type="text"
-                    placeholder="$Seconds"
+                    placeholder="$SECOND"
                     value={jackpotCurrency}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJackpotCurrency('$Seconds')}
-                    disabled
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJackpotCurrency(e.target.value)}
                     className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-500"
                   />
                 </div>
@@ -540,10 +554,9 @@ export default function AdminPage(): JSX.Element {
                 <Label className="text-gray-300 text-sm">Prize Currency</Label>
                 <Input
                   type="text"
-                  placeholder="$Seconds"
+                  placeholder="$SECOND, BTC, ETH, SATS"
                   value={prizeCurrency}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency('$Seconds')}
-                  disabled
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency(e.target.value)}
                   className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-500"
                 />
               </div>
@@ -555,15 +568,6 @@ export default function AdminPage(): JSX.Element {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
-
-        {/* Weekly Check-In Leaderboard */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.65 }}
-        >
-          <CheckInLeaderboard />
         </motion.div>
 
         {/* Info Notes */}
@@ -582,10 +586,26 @@ export default function AdminPage(): JSX.Element {
                       Auto-Announcement
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      Starting rounds and posting results will automatically announce in Global Chat.
+                      {APP_CONFIG.mode === 'mock' 
+                        ? 'In Mock Mode, Farcaster posts are simulated and logged to console.'
+                        : 'Starting rounds and posting results will automatically announce on Farcaster with formatted messages.'
+                      }
                     </p>
                   </div>
                 </div>
+                {APP_CONFIG.mode === 'mock' && (
+                  <div className="flex items-start gap-2 pt-2 border-t border-cyan-500/20">
+                    <span className="text-yellow-400 mt-0.5">🧪</span>
+                    <div>
+                      <p className="text-sm text-yellow-300 font-bold">
+                        Mock Mode Active
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        All operations use simulated data. Switch to Real-Time mode in config for live Bitcoin data.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

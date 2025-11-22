@@ -1,173 +1,131 @@
-﻿#![allow(unused_imports)]
-#![allow(dead_code)]
+// SpacetimeDB imports
+use spacetimedb::{table, reducer, ReducerContext, Table, Timestamp, UniqueColumn};
 
-// Bitcoin Blocks SpacetimeDB module (maincloud)
-// Tables and reducers aligned with generated TypeScript bindings under src/spacetime_module_bindings
-
-use spacetimedb::{reducer, table, ReducerContext, Table, Timestamp, ScheduleAt};
-use core::time::Duration;
-use std::time::UNIX_EPOCH;
-
-// Key/Value settings for dynamic content and rules
-#[table(name = settings, public)]
-#[derive(Clone, Debug)]
-pub struct Setting {
-    #[primary_key]
-    pub key: String,
-    pub value: String,
-    pub updated_at: i64,
+// Helper: current Unix timestamp in seconds (i64)
+fn now_unix_seconds(ctx: &ReducerContext) -> i64 {
+    ctx.timestamp.to_micros_since_unix_epoch() / 1_000_000
 }
 
-// Check-ins: daily points + streaks
-#[table(name = checkins, public)]
-#[derive(Clone, Debug)]
-pub struct CheckIn {
-    #[primary_key]
-    #[auto_inc]
-    pub checkin_id: u64,
-    pub user_identifier: String,
-    pub username: String,
-    pub pfp_url: String,
-    pub checkin_date: i64,
-    pub points_earned: i64,
-    pub streak_count: i64,
-}
+// --- Table Definitions ---
 
-#[table(name = user_stats, public)]
-#[derive(Clone, Debug)]
-pub struct UserStat {
-    #[primary_key]
-    #[auto_inc]
-    pub stat_id: u64,
-    #[unique]
-    pub user_identifier: String,
-    pub username: String,
-    pub pfp_url: String,
-    pub total_points: i64,
-    pub current_streak: i64,
-    pub longest_streak: i64,
-    pub last_checkin_date: i64,
-    pub total_checkins: i64,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
-
-// Chat messages table
-#[table(name = chat_messages, public)]
-#[derive(Clone, Debug)]
-pub struct ChatMessage {
-    #[primary_key]
-    #[auto_inc]
-    pub chat_id: u64,
-    pub round_id: String,
-    pub address: String,
-    pub username: String,
-    pub message: String,
-    pub pfp_url: String,
-    pub timestamp: i64,
-    pub msg_type: String,
-}
-
-// User guesses table
-#[table(name = guesses, public)]
-#[derive(Clone, Debug)]
-pub struct Guess {
-    #[primary_key]
-    #[auto_inc]
-    pub guess_id: u64,
-    pub round_id: u64,
-    pub fid: i64,
-    pub username: String,
-    pub guess: i64,
-    pub pfp_url: Option<String>,
-    pub submitted_at: i64,
-}
-
-// Logs table (simple event log)
-#[table(name = logs, public)]
-#[derive(Clone, Debug)]
-pub struct LogEvent {
-    #[primary_key]
-    #[auto_inc]
-    pub log_id: u64,
-    pub event_type: String,
-    pub details: String,
-    pub timestamp: i64,
-}
-
-// Prize configuration (single row, id = 1)
-#[table(name = prize_config, public)]
-#[derive(Clone, Debug)]
-pub struct PrizeConfig {
-    #[primary_key]
-    pub config_id: u8,
-    pub jackpot_amount: i64,
-    pub first_place_amount: i64,
-    pub second_place_amount: i64,
-    pub currency_type: String,
-    pub updated_at: i64,
-}
-
-// Game rounds
 #[table(name = rounds, public)]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Round {
     #[primary_key]
     #[auto_inc]
-    pub round_id: u64,
-    pub round_number: i64,
-    pub start_time: i64,
-    pub end_time: i64,
-    pub duration_minutes: i64,
-    pub prize: String,
-    pub status: String,
-    pub block_number: Option<i64>,
-    pub actual_tx_count: Option<i64>,
-    pub winning_fid: Option<i64>,
-    pub second_place_winner_fid: Option<i64>,
-    pub block_hash: Option<String>,
-    pub created_at: i64,
+    round_id: u64,
+    round_number: i64,     // Admin-entered display round number
+    start_time: i64,       // Unix seconds
+    end_time: i64,         // Unix seconds
+    duration_minutes: i64, // Admin-entered duration in minutes
+    prize: String,
+    #[index(btree)]
+    status: String,        // "open", "closed", "finished"
+    block_number: Option<i64>,  // Target Bitcoin block number
+    actual_tx_count: Option<i64>,
+    winning_fid: Option<i64>,           // Jackpot (exact) or closest
+    second_place_winner_fid: Option<i64>, // Runner-up (second closest)
+    block_hash: Option<String>,
+    created_at: i64,       // Unix seconds
 }
 
-// Scheduled timer to periodically enforce round state (auto-close)
-#[table(name = round_timer, scheduled(tick_rounds))]
-#[derive(Clone, Debug)]
-pub struct RoundTimer {
+#[table(name = guesses, public)]
+#[derive(Clone)]
+pub struct Guess {
     #[primary_key]
     #[auto_inc]
-    pub scheduled_id: u64,
-    pub scheduled_at: ScheduleAt,
+    guess_id: u64,
+    #[index(btree)]
+    round_id: u64,
+    #[index(btree)]
+    fid: i64,              // Placeholder for address/ID
+    username: String,
+    guess: i64,
+    pfp_url: Option<String>,
+    submitted_at: i64,     // Unix seconds
+}
+
+#[table(name = logs, public)]
+#[derive(Clone)]
+pub struct LogEvent {
+    #[primary_key]
+    #[auto_inc]
+    log_id: u64,
+    event_type: String,  // e.g., "round_created", "guess_submitted", etc.
+    details: String,
+    timestamp: i64,      // Unix seconds
+}
+
+#[table(name = chat_messages, public)]
+#[derive(Clone)]
+pub struct ChatMessage {
+    #[primary_key]
+    #[auto_inc]
+    chat_id: u64,
+    #[index(btree)]
+    round_id: String,    // Can be round ID or "global"
+    address: String,     // Address/identifier
+    username: String,
+    message: String,
+    pfp_url: String,
+    timestamp: i64,      // Unix seconds
+    msg_type: String,    // "guess", "system", "winner", "chat"
+}
+
+// PrizeConfig schema (singleton latest config)
+#[table(name = prize_config, public)]
+#[derive(Clone)]
+pub struct PrizeConfig {
+    #[primary_key]
+    #[auto_inc]
+    config_id: u64,
+    jackpot_amount: i64,
+    first_place_amount: i64,
+    second_place_amount: i64,
+    currency_type: String,
+    token_contract_address: String,
+    updated_at: i64,
+}
+
+// CheckIn table - tracks individual check-in events
+#[table(name = checkins, public)]
+#[derive(Clone)]
+pub struct CheckIn {
+    #[primary_key]
+    #[auto_inc]
+    checkin_id: u64,
+    #[index(btree)]
+    user_identifier: String,  // FID or wallet address
+    username: String,
+    pfp_url: String,
+    checkin_date: i64,        // Unix timestamp
+    points_earned: i64,
+    streak_count: i64,
+}
+
+// UserStat table - tracks overall user statistics
+#[table(name = user_stats, public)]
+#[derive(Clone)]
+pub struct UserStat {
+    #[primary_key]
+    #[auto_inc]
+    stat_id: u64,
+    #[unique]
+    user_identifier: String,  // FID or wallet address
+    username: String,
+    pfp_url: String,
+    total_points: i64,
+    current_streak: i64,
+    longest_streak: i64,
+    last_checkin_date: i64,
+    total_checkins: i64,
+    created_at: i64,
+    updated_at: i64,
 }
 
 // --- Reducers ---
 
-// Helper: return current timestamp in SECONDS based on reducer context
-// Frontend converts seconds -> ms
-fn now_secs(ctx: &ReducerContext) -> i64 {
-    // Use reducer invocation timestamp (host-provided) and convert to seconds
-    let st: std::time::SystemTime = ctx.timestamp.into();
-    st.duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
-
-fn day_start(ts: i64) -> i64 { ts - (ts % 86_400) }
-
-fn get_setting(ctx: &ReducerContext, k: &str) -> Option<String> {
-    for s in ctx.db.settings().iter() {
-        if s.key == k { return Some(s.value.clone()); }
-    }
-    None
-}
-
-fn parse_i64(s: Option<String>, def: i64) -> i64 {
-    s.and_then(|x| x.parse::<i64>().ok()).unwrap_or(def)
-}
-
-fn parse_bool(s: Option<String>, def: bool) -> bool {
-    match s { Some(x) => x == "true" || x == "1", None => def }
-}
-
+// Note: SpacetimeDB reducers do not return data. Clients should read results from public tables.
 #[reducer]
 pub fn create_round(
     ctx: &ReducerContext,
@@ -175,185 +133,257 @@ pub fn create_round(
     duration_minutes: i64,
     prize: String,
     block_number: Option<i64>,
-) {
-    let start = now_secs(ctx);
-    // Store seconds in DB; frontend multiplies by 1000
-    let end = start + duration_minutes.saturating_mul(60);
-
-    // Ensure periodic timer exists even on upgraded deployments
-    let mut has_timer = false;
-    for _t in ctx.db.round_timer().iter() { has_timer = true; break; }
-    if !has_timer {
-        ctx.db.round_timer().insert(RoundTimer {
-            scheduled_id: 0,
-            scheduled_at: ScheduleAt::Interval(Duration::from_secs(5).into()),
-        });
+) -> Result<(), String> {
+    // Basic validation
+    if duration_minutes <= 0 {
+        return Err("duration_minutes must be greater than 0".into());
     }
 
-    // Close any existing open rounds to enforce a single-open invariant
-    let mut closed_any = false;
-    for r in ctx.db.rounds().iter() {
-        if r.status == "open" {
-            let mut u = r.clone();
-            u.status = "closed".to_string();
-            ctx.db.rounds().delete(r);
-            ctx.db.rounds().insert(u);
-            closed_any = true;
-        }
-    }
-    if closed_any {
-        ctx.db.logs().insert(LogEvent {
-            log_id: 0,
-            event_type: "enforce_single_open_round".to_string(),
-            details: format!("auto_closed_previous at {}", start),
-            timestamp: start,
-        });
-    }
+    let created_at = now_unix_seconds(ctx);
+    let start_time = created_at;
+    let end_time = start_time + (duration_minutes * 60);
 
-    ctx.db.rounds().insert(Round {
+    let new_round = Round {
         round_id: 0, // auto_inc
         round_number,
-        start_time: start,
-        end_time: end,
+        start_time,
+        end_time,
         duration_minutes,
-        prize,
+        prize: prize.clone(),
         status: "open".to_string(),
         block_number,
         actual_tx_count: None,
         winning_fid: None,
         second_place_winner_fid: None,
         block_hash: None,
-        created_at: start,
-    });
-}
-
-// Run once on first publish (and when clearing data). Start periodic timer.
-#[reducer(init)]
-pub fn init(ctx: &ReducerContext) {
-    // Ensure exactly one periodic timer exists (every 5 seconds)
-    let mut has_timer = false;
-    for _t in ctx.db.round_timer().iter() { has_timer = true; break; }
-    if !has_timer {
-        ctx.db.round_timer().insert(RoundTimer {
-            scheduled_id: 0,
-            scheduled_at: ScheduleAt::Interval(Duration::from_secs(5).into()),
-        });
-    }
-
-    // Seed default settings if missing
-    let defaults: [(&str, &str); 14] = [
-        ("homepage_title", "Bitcoin Blocks"),
-        ("homepage_tagline", "Predicting Bitcoin’s Next Block"),
-        ("metadata_title", "Bitcoin Blocks"),
-        ("metadata_description", "Predict Bitcoin transactions & compete!"),
-        ("announce_template_round_start", "🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m"),
-        ("announce_template_results", "📊 Block #{block} had {txCount} txs. 🥇 @{winner}"),
-        ("admin_poll_interval_seconds", "30"),
-        ("guess_min", "1"),
-        ("guess_max", "20000"),
-        ("require_fid_for_guess", "true"),
-        ("admin_announce_requires_fid", "true"),
-        ("checkin_base_points", "10"),
-        ("checkin_streak_bonus_per_day", "2"),
-        ("checkin_week_window_days", "7"),
-    ];
-
-    for (k, v) in defaults {
-        let mut exists = false;
-        for s in ctx.db.settings().iter() { if s.key == k { exists = true; break; } }
-        if !exists {
-            ctx.db.settings().insert(Setting { key: k.into(), value: v.into(), updated_at: now_secs(ctx) });
-        }
-    }
-}
-
-// Scheduled reducer: close any rounds whose end_time has passed
-#[reducer]
-pub fn tick_rounds(ctx: &ReducerContext, _timer: RoundTimer) {
-    let now = now_secs(ctx);
-    // Iterate and close overdue open rounds
-    let mut closed_count = 0i64;
-    for r in ctx.db.rounds().iter() {
-        if r.status == "open" && r.end_time <= now {
-            let mut updated = r.clone();
-            updated.status = "closed".to_string();
-            ctx.db.rounds().delete(r);
-            ctx.db.rounds().insert(updated);
-            closed_count += 1;
-        }
-    }
-
-    if closed_count > 0 {
-        ctx.db.logs().insert(LogEvent {
-            log_id: 0,
-            event_type: "auto_close_rounds".to_string(),
-            details: format!("closed={} at {}", closed_count, now),
-            timestamp: now,
-        });
-    }
-}
-
-#[reducer]
-pub fn end_round_manually(ctx: &ReducerContext, round_id: u64) {
-    // Mark the round as closed (lock submissions)
-    let mut changed = false;
-    for r in ctx.db.rounds().iter() {
-        if r.round_id == round_id {
-            if r.status == "closed" || r.status == "finished" {
-                // idempotent
-            } else {
-                let mut updated = r.clone();
-                updated.status = "closed".to_string();
-                ctx.db.rounds().delete(r);
-                ctx.db.rounds().insert(updated);
-                changed = true;
-            }
-            break;
-        }
-    }
-
-    // Log action
-    let ts = now_secs(ctx);
-    ctx.db.logs().insert(LogEvent {
-        log_id: 0,
-        event_type: "end_round_manually".to_string(),
-        details: format!("round_id={} changed={}", round_id, changed),
-        timestamp: ts,
-    });
-}
-
-#[reducer]
-pub fn get_active_round(_ctx: &ReducerContext) {
-    // No-op; clients subscribe to tables directly
-}
-
-#[reducer]
-pub fn get_prize_config(_ctx: &ReducerContext) {
-    // No-op; clients subscribe to tables directly
-}
-
-#[reducer]
-pub fn save_prize_config(
-    ctx: &ReducerContext,
-    jackpot_amount: i64,
-    first_place_amount: i64,
-    second_place_amount: i64,
-    currency_type: String,
-) {
-    let updated_at = now_secs(ctx);
-    // Upsert row with id = 1: delete any existing then insert fresh
-    for existing in ctx.db.prize_config().iter() {
-        ctx.db.prize_config().delete(existing);
-    }
-    let row = PrizeConfig {
-        config_id: 1,
-        jackpot_amount,
-        first_place_amount,
-        second_place_amount,
-        currency_type,
-        updated_at,
+        created_at,
     };
-    ctx.db.prize_config().insert(row);
+
+    match ctx.db.rounds().try_insert(new_round) {
+        Ok(inserted) => {
+            // Log event with the generated round_id
+            let block_num_str = inserted.block_number.map(|n| n.to_string()).unwrap_or_else(|| "N/A".to_string());
+            let details = format!(
+                "round_id={}, round_number={}, start_time={}, end_time={}, duration_minutes={}, prize={}, block_number={}",
+                inserted.round_id, inserted.round_number, inserted.start_time, inserted.end_time, inserted.duration_minutes, prize, block_num_str
+            );
+            let _ = ctx.db.logs().try_insert(LogEvent {
+                log_id: 0,
+                event_type: "round_created".to_string(),
+                details,
+                timestamp: created_at,
+            });
+            spacetimedb::log::info!("Round {} created", inserted.round_id);
+            Ok(())
+        }
+        Err(e) => {
+            let msg = format!("Failed to create round: {}", e);
+            spacetimedb::log::error!("{}", msg);
+            Err(msg)
+        }
+    }
+}
+
+#[reducer]
+pub fn submit_guess(
+    ctx: &ReducerContext,
+    round_id: u64,
+    fid: i64,
+    username: String,
+    guess: i64,
+    pfp_url: Option<String>,
+) -> Result<(), String> {
+    // Validate round exists and is open
+    let round = match ctx.db.rounds().round_id().find(&round_id) {
+        Some(r) => r,
+        None => return Err("Round not found".into()),
+    };
+
+    if round.status != "open" {
+        return Err("Round is not open for guesses".into());
+    }
+
+    // Time-based validation: must be within [start_time, end_time)
+    let now = now_unix_seconds(ctx);
+    if now < round.start_time {
+        return Err("Round has not started yet".into());
+    }
+    if now >= round.end_time {
+        return Err("Round has ended; no more guesses allowed".into());
+    }
+
+    // Ensure user hasn't already submitted a guess for this round
+    for g in ctx.db.guesses().iter() {
+        if g.round_id == round_id && g.fid == fid {
+            return Err("User has already submitted a guess for this round".into());
+        }
+    }
+
+    let submitted_at = now;
+
+    let guess_row = Guess {
+        guess_id: 0, // auto_inc
+        round_id,
+        fid,
+        username: username.clone(),
+        guess,
+        pfp_url: pfp_url.clone(),
+        submitted_at,
+    };
+
+    match ctx.db.guesses().try_insert(guess_row) {
+        Ok(inserted) => {
+            // Log event
+            let details = format!(
+                "round_id={}, guess_id={}, fid={}, username={}, guess={}, pfp_url={}",
+                round_id,
+                inserted.guess_id,
+                fid,
+                username,
+                guess,
+                pfp_url.clone().unwrap_or_else(|| "".to_string())
+            );
+            let _ = ctx.db.logs().try_insert(LogEvent {
+                log_id: 0,
+                event_type: "guess_submitted".to_string(),
+                details,
+                timestamp: submitted_at,
+            });
+            spacetimedb::log::info!("Guess {} submitted for round {}", inserted.guess_id, round_id);
+            Ok(())
+        }
+        Err(e) => {
+            let msg = format!("Failed to submit guess: {}", e);
+            spacetimedb::log::error!("{}", msg);
+            Err(msg)
+        }
+    }
+}
+
+#[reducer]
+pub fn end_round_manually(ctx: &ReducerContext, round_id: u64) -> Result<(), String> {
+    if let Some(mut round) = ctx.db.rounds().round_id().find(&round_id) {
+        if round.status != "open" {
+            return Err("Round is not in 'open' status".into());
+        }
+
+        round.status = "closed".to_string();
+        // Store details before moving round in update
+        let details = format!("round_id={} closed manually", round_id);
+
+        ctx.db.rounds().round_id().update(round);
+
+        let _ = ctx.db.logs().try_insert(LogEvent {
+            log_id: 0,
+            event_type: "round_closed_manually".to_string(),
+            details,
+            timestamp: now_unix_seconds(ctx),
+        });
+
+        spacetimedb::log::info!("Round {} closed manually", round_id);
+        Ok(())
+    } else {
+        Err("Round not found".into())
+    }
+}
+
+#[reducer]
+pub fn update_round_result(
+    ctx: &ReducerContext,
+    round_id: u64,
+    actual_tx_count: i64,
+    block_hash: String,
+    winning_fid: i64,
+) -> Result<(), String> {
+    // Preserve provided fid for logging/back-compat only
+    let provided_winning_fid = winning_fid;
+
+    if let Some(mut round) = ctx.db.rounds().round_id().find(&round_id) {
+        if round.status == "finished" {
+            return Err("Round is already finished".into());
+        }
+        // Require round to be closed before updating result to enforce lifecycle
+        if round.status != "closed" {
+            return Err("Round must be 'closed' before updating result".into());
+        }
+
+        // Collect guesses for this round
+        let mut round_guesses: Vec<Guess> = Vec::new();
+        for g in ctx.db.guesses().iter() {
+            if g.round_id == round_id {
+                round_guesses.push(g.clone());
+            }
+        }
+
+        // Rank guesses by absolute difference, then by earliest submission
+        let mut ranked: Vec<(Guess, i64)> = round_guesses
+            .into_iter()
+            .map(|g| {
+                let diff = (g.guess - actual_tx_count).abs();
+                (g, diff)
+            })
+            .collect();
+
+        ranked.sort_by(|a, b| {
+            let ad = a.1;
+            let bd = b.1;
+            match ad.cmp(&bd) {
+                std::cmp::Ordering::Equal => a.0.submitted_at.cmp(&b.0.submitted_at),
+                other => other,
+            }
+        });
+
+        let mut computed_winner: Option<i64> = None;
+        let mut computed_runner_up: Option<i64> = None;
+        let mut is_jackpot = false;
+
+        if let Some((first, first_diff)) = ranked.get(0) {
+            computed_winner = Some(first.fid);
+            if *first_diff == 0 {
+                is_jackpot = true;
+            }
+        }
+        if ranked.len() > 1 {
+            computed_runner_up = Some(ranked[1].0.fid);
+        }
+
+        // Prepare details before update to avoid moved values issues
+        let details = format!(
+            "round_id={}, actual_tx_count={}, computed_winner_fid={:?}, runner_up_fid={:?}, jackpot={}, provided_winning_fid={}, block_hash={}",
+            round_id,
+            actual_tx_count,
+            computed_winner,
+            computed_runner_up,
+            is_jackpot,
+            provided_winning_fid,
+            block_hash
+        );
+
+        round.actual_tx_count = Some(actual_tx_count);
+        round.block_hash = Some(block_hash);
+        round.winning_fid = computed_winner;
+        round.second_place_winner_fid = computed_runner_up;
+        round.status = "finished".to_string();
+
+        ctx.db.rounds().round_id().update(round);
+
+        let _ = ctx.db.logs().try_insert(LogEvent {
+            log_id: 0,
+            event_type: "round_finished".to_string(),
+            details,
+            timestamp: now_unix_seconds(ctx),
+        });
+
+        spacetimedb::log::info!(
+            "Round {} updated with results and marked finished (winner: {:?}, runner_up: {:?})",
+            round_id,
+            computed_winner,
+            computed_runner_up
+        );
+        Ok(())
+    } else {
+        Err("Round not found".into())
+    }
 }
 
 #[reducer]
@@ -365,184 +395,338 @@ pub fn send_chat_message(
     message: String,
     pfp_url: String,
     msg_type: String,
-) {
-    let ts = now_secs(ctx);
-    ctx.db.chat_messages().insert(ChatMessage {
+) -> Result<(), String> {
+    let timestamp = now_unix_seconds(ctx);
+
+    let chat_msg = ChatMessage {
         chat_id: 0, // auto_inc
-        round_id,
-        address,
-        username,
-        message,
-        pfp_url,
-        timestamp: ts,
-        msg_type,
-    });
-}
-
-#[reducer]
-pub fn submit_guess(
-    ctx: &ReducerContext,
-    round_id: u64,
-    fid: i64,
-    username: String,
-    guess: i64,
-    pfp_url: Option<String>,
-) {
-    let ts = now_secs(ctx);
-
-    // Find the round
-    let mut round_opt: Option<Round> = None;
-    for r in ctx.db.rounds().iter() {
-        if r.round_id == round_id { round_opt = Some(r.clone()); break; }
-    }
-    if round_opt.is_none() {
-        return;
-    }
-    let r = round_opt.unwrap();
-
-    // Guard: round must be open and not expired
-    if r.status != "open" { return; }
-    if ts >= r.end_time { return; }
-
-    // Guard: only one guess per fid per round
-    for g in ctx.db.guesses().iter() {
-        if g.round_id == round_id && g.fid == fid {
-            return;
-        }
-    }
-
-    // Guard: enforce min/max guess range from settings
-    let min = parse_i64(get_setting(ctx, "guess_min"), 1);
-    let max = parse_i64(get_setting(ctx, "guess_max"), 20_000);
-    if guess < min || guess > max { return; }
-
-    ctx.db.guesses().insert(Guess {
-        guess_id: 0, // auto_inc
-        round_id,
-        fid,
-        username,
-        guess,
-        pfp_url,
-        submitted_at: ts,
-    });
-}
-
-#[reducer]
-pub fn update_round_result(
-    ctx: &ReducerContext,
-    round_id: u64,
-    actual_tx_count: i64,
-    block_hash: String,
-    winning_fid: i64,
-) {
-    // Update the round row with results and mark as finished
-    let mut found = false;
-    for r in ctx.db.rounds().iter() {
-        if r.round_id == round_id {
-            let mut updated = r.clone();
-            updated.status = "finished".to_string();
-            updated.actual_tx_count = Some(actual_tx_count);
-            updated.block_hash = Some(block_hash.clone());
-            updated.winning_fid = Some(winning_fid);
-
-            ctx.db.rounds().delete(r);
-            ctx.db.rounds().insert(updated);
-            found = true;
-            break;
-        }
-    }
-
-    // Log the update
-    let ts = now_secs(ctx);
-    let details = if found {
-        format!(
-            "updated round_id={};txcount={};winner={}",
-            round_id, actual_tx_count, winning_fid
-        )
-    } else {
-        format!(
-            "round not found: round_id={};txcount={};winner={}",
-            round_id, actual_tx_count, winning_fid
-        )
+        round_id: round_id.clone(),
+        address: address.clone(),
+        username: username.clone(),
+        message: message.clone(),
+        pfp_url: pfp_url.clone(),
+        timestamp,
+        msg_type: msg_type.clone(),
     };
-    ctx.db.logs().insert(LogEvent {
-        log_id: 0,
-        event_type: "update_round_result".to_string(),
-        details,
-        timestamp: ts,
-    });
+
+    match ctx.db.chat_messages().try_insert(chat_msg) {
+        Ok(inserted) => {
+            // Log event
+            let details = format!(
+                "chat_id={}, round_id={}, address={}, username={}, msg_type={}",
+                inserted.chat_id, round_id, address, username, msg_type
+            );
+            let _ = ctx.db.logs().try_insert(LogEvent {
+                log_id: 0,
+                event_type: "chat_message_sent".to_string(),
+                details,
+                timestamp,
+            });
+            spacetimedb::log::info!("Chat message {} sent", inserted.chat_id);
+            Ok(())
+        }
+        Err(e) => {
+            let msg = format!("Failed to send chat message: {}", e);
+            spacetimedb::log::error!("{}", msg);
+            Err(msg)
+        }
+    }
 }
 
-// Daily check-in with streaks and points
+#[reducer]
+pub fn get_active_round(ctx: &ReducerContext) -> Result<(), String> {
+    // Select the most recent round whose status is "open" or "closed"
+    let mut active: Option<Round> = None;
+    for r in ctx.db.rounds().iter() {
+        if r.status == "open" || r.status == "closed" {
+            match &active {
+                Some(curr) => {
+                    if r.round_id > curr.round_id {
+                        active = Some(r.clone());
+                    }
+                }
+                None => active = Some(r.clone()),
+            }
+        }
+    }
+
+    // Log the lookup (clients can read the rounds table directly)
+    let details = match active {
+        Some(r) => format!(
+            "active_round_id={}, status={}, start_time={}, end_time={}, duration_minutes={}",
+            r.round_id, r.status, r.start_time, r.end_time, r.duration_minutes
+        ),
+        None => "no_active_round".to_string(),
+    };
+
+    let _ = ctx.db.logs().try_insert(LogEvent {
+        log_id: 0,
+        event_type: "active_round_checked".to_string(),
+        details,
+        timestamp: now_unix_seconds(ctx),
+    });
+
+    Ok(())
+}
+
+// New reducers for PrizeConfig
+
+#[reducer]
+pub fn savePrizeConfig(
+    ctx: &ReducerContext,
+    jackpot_amount: i64,
+    first_place_amount: i64,
+    second_place_amount: i64,
+    currency_type: String,
+    token_contract_address: String,
+) -> Result<(), String> {
+    // Basic validation
+    if jackpot_amount <= 0 || first_place_amount <= 0 || second_place_amount <= 0 {
+        return Err("All prize amounts must be positive numbers".into());
+    }
+
+    if currency_type.trim().is_empty() {
+        return Err("Currency type must be non-empty".into());
+    }
+
+    let now_unix = now_unix_seconds(ctx);
+
+    if ctx.db.prize_config().count() == 0 {
+        // Insert first config
+        let new_cfg = PrizeConfig {
+            config_id: 0, // auto_inc
+            jackpot_amount,
+            first_place_amount,
+            second_place_amount,
+            currency_type: currency_type.clone(),
+            token_contract_address: token_contract_address.clone(),
+            updated_at: now_unix,
+        };
+
+        match ctx.db.prize_config().try_insert(new_cfg) {
+            Ok(inserted) => {
+                let details = format!(
+                    "created config_id={} jackpot_amount={} first_place={} second_place={} currency='{}'",
+                    inserted.config_id, jackpot_amount, first_place_amount, second_place_amount, currency_type
+                );
+                let _ = ctx.db.logs().try_insert(LogEvent {
+                    log_id: 0,
+                    event_type: "prize_config_saved".to_string(),
+                    details,
+                    timestamp: now_unix,
+                });
+                spacetimedb::log::info!("PrizeConfig created (config_id={})", inserted.config_id);
+                Ok(())
+            }
+            Err(e) => {
+                let msg = format!("Failed to create prize config: {}", e);
+                spacetimedb::log::error!("{}", msg);
+                Err(msg)
+            }
+        }
+    } else {
+        // Update the latest row (by highest config_id)
+        let mut latest: Option<PrizeConfig> = None;
+        for cfg in ctx.db.prize_config().iter() {
+            match &latest {
+                Some(curr) => {
+                    if cfg.config_id > curr.config_id {
+                        latest = Some(cfg.clone());
+                    }
+                }
+                None => latest = Some(cfg.clone()),
+            }
+        }
+
+        if let Some(mut current) = latest {
+            current.jackpot_amount = jackpot_amount;
+            current.first_place_amount = first_place_amount;
+            current.second_place_amount = second_place_amount;
+            current.currency_type = currency_type.clone();
+            current.token_contract_address = token_contract_address.clone();
+            current.updated_at = now_unix;
+
+            // Prepare details before update (avoid moved values)
+            let details = format!(
+                "updated config_id={} jackpot_amount={} first_place={} second_place={} currency='{}'",
+                current.config_id, jackpot_amount, first_place_amount, second_place_amount, currency_type
+            );
+
+            ctx.db.prize_config().config_id().update(current);
+
+            // Ensure only one row remains by deleting older rows (if any)
+            let mut to_delete: Vec<u64> = Vec::new();
+            for cfg in ctx.db.prize_config().iter() {
+                if let Some(lat) = &latest {
+                    if cfg.config_id != lat.config_id {
+                        to_delete.push(cfg.config_id);
+                    }
+                }
+            }
+            for id in to_delete {
+                ctx.db.prize_config().config_id().delete(&id);
+            }
+
+            let _ = ctx.db.logs().try_insert(LogEvent {
+                log_id: 0,
+                event_type: "prize_config_saved".to_string(),
+                details,
+                timestamp: now_unix,
+            });
+
+            spacetimedb::log::info!("PrizeConfig updated");
+            Ok(())
+        } else {
+            // Fallback: no latest found despite count > 0 (shouldn't happen)
+            let msg = "Inconsistent state: prize_config count > 0 but no rows found".to_string();
+            spacetimedb::log::error!("{}", msg);
+            Err(msg)
+        }
+    }
+}
+
+#[reducer]
+pub fn getPrizeConfig(ctx: &ReducerContext) -> Result<(), String> {
+    // Fetch the latest config (by highest config_id) and log it.
+    let mut latest: Option<PrizeConfig> = None;
+    for cfg in ctx.db.prize_config().iter() {
+        match &latest {
+            Some(curr) => {
+                if cfg.config_id > curr.config_id {
+                    latest = Some(cfg.clone());
+                }
+            }
+            None => latest = Some(cfg.clone()),
+        }
+    }
+
+    let details = match latest {
+        Some(cfg) => format!(
+            "latest_config_id={} jackpot_amount={} first_place={} second_place={} currency='{}'",
+            cfg.config_id, cfg.jackpot_amount, cfg.first_place_amount, cfg.second_place_amount, cfg.currency_type
+        ),
+        None => "no_prize_config_found".to_string(),
+    };
+
+    let _ = ctx.db.logs().try_insert(LogEvent {
+        log_id: 0,
+        event_type: "prize_config_checked".to_string(),
+        details,
+        timestamp: now_unix_seconds(ctx),
+    });
+
+    // Clients should read the public prize_config table to get the data.
+    Ok(())
+}
+
+// Helper: get start of day timestamp (UTC)
+fn get_day_start(timestamp: i64) -> i64 {
+    timestamp - (timestamp % 86400)
+}
+
+// Daily Check-In Reducer
 #[reducer]
 pub fn daily_checkin(
     ctx: &ReducerContext,
     user_identifier: String,
     username: String,
     pfp_url: String,
-) {
-    let now = now_secs(ctx);
-    let today = day_start(now);
+) -> Result<(), String> {
+    let now = now_unix_seconds(ctx);
+    let today_start = get_day_start(now);
 
-    // If already checked in today, no-op
-    for c in ctx.db.checkins().iter() {
-        if c.user_identifier == user_identifier && day_start(c.checkin_date) == today {
-            return;
+    // Check if user already checked in today
+    for checkin in ctx.db.checkins().iter() {
+        if checkin.user_identifier == user_identifier {
+            let checkin_day_start = get_day_start(checkin.checkin_date);
+            if checkin_day_start == today_start {
+                return Err("Already checked in today".into());
+            }
         }
     }
 
-    // Load existing user stats (if any)
-    let mut existing: Option<UserStat> = None;
-    for s in ctx.db.user_stats().iter() {
-        if s.user_identifier == user_identifier {
-            existing = Some(s.clone());
+    // Find or create user_stat
+    let mut user_stat_opt: Option<UserStat> = None;
+    for stat in ctx.db.user_stats().iter() {
+        if stat.user_identifier == user_identifier {
+            user_stat_opt = Some(stat.clone());
             break;
         }
     }
 
-    // Dynamic points configuration
-    let base_points = parse_i64(get_setting(ctx, "checkin_base_points"), 10);
-    let bonus_per_day = parse_i64(get_setting(ctx, "checkin_streak_bonus_per_day"), 2);
+    let (new_streak, total_checkins, total_points, longest_streak) = match user_stat_opt {
+        Some(mut stat) => {
+            // Calculate streak
+            let last_checkin_day = get_day_start(stat.last_checkin_date);
+            let yesterday = today_start - 86400;
+            
+            let new_streak = if last_checkin_day == yesterday {
+                // Consecutive day
+                stat.current_streak + 1
+            } else if last_checkin_day < yesterday {
+                // Missed day(s), reset streak
+                1
+            } else {
+                // Should not happen (already checked in today above)
+                stat.current_streak
+            };
 
-    let (new_streak, total_checkins, total_points, longest_streak) = if let Some(mut s) = existing {
-        let last_day = day_start(s.last_checkin_date);
-        let yesterday = today - 86_400;
-        let new_streak = if last_day == yesterday { s.current_streak + 1 } else if last_day < yesterday { 1 } else { s.current_streak };
-        let points = base_points + (new_streak * bonus_per_day);
-        s.current_streak = new_streak;
-        s.total_points += points;
-        if s.current_streak > s.longest_streak { s.longest_streak = s.current_streak; }
-        s.last_checkin_date = now;
-        s.total_checkins += 1;
-        s.updated_at = now;
-        s.username = username.clone();
-        s.pfp_url = pfp_url.clone();
-        // Replace row (update semantics)
-        let pk = s.stat_id;
-        for row in ctx.db.user_stats().iter() { if row.stat_id == pk { ctx.db.user_stats().delete(row); break; } }
-        ctx.db.user_stats().insert(s.clone());
-        (new_streak, s.total_checkins, s.total_points, s.longest_streak)
-    } else {
-        let points = base_points + bonus_per_day; // base + first day bonus
-        let s = UserStat {
-            stat_id: 0,
-            user_identifier: user_identifier.clone(),
-            username: username.clone(),
-            pfp_url: pfp_url.clone(),
-            total_points: points,
-            current_streak: 1,
-            longest_streak: 1,
-            last_checkin_date: now,
-            total_checkins: 1,
-            created_at: now,
-            updated_at: now,
-        };
-        ctx.db.user_stats().insert(s);
-        (1, 1, points, 1)
+            // Calculate points: base 10 + streak bonus
+            let points = 10 + (new_streak * 2);
+            let new_total = stat.total_points + points;
+            let new_longest = if new_streak > stat.longest_streak {
+                new_streak
+            } else {
+                stat.longest_streak
+            };
+
+            // Update user_stat
+            stat.current_streak = new_streak;
+            stat.total_points = new_total;
+            stat.longest_streak = new_longest;
+            stat.last_checkin_date = now;
+            stat.total_checkins += 1;
+            stat.updated_at = now;
+            stat.username = username.clone();
+            stat.pfp_url = pfp_url.clone();
+
+            ctx.db.user_stats().user_identifier().update(stat.clone());
+
+            (new_streak, stat.total_checkins, new_total, new_longest)
+        }
+        None => {
+            // Create new user_stat
+            let points = 10 + 2; // base 10 + 1 day streak bonus
+            let new_stat = UserStat {
+                stat_id: 0,
+                user_identifier: user_identifier.clone(),
+                username: username.clone(),
+                pfp_url: pfp_url.clone(),
+                total_points: points,
+                current_streak: 1,
+                longest_streak: 1,
+                last_checkin_date: now,
+                total_checkins: 1,
+                created_at: now,
+                updated_at: now,
+            };
+
+            match ctx.db.user_stats().try_insert(new_stat) {
+                Ok(_) => {}
+                Err(e) => {
+                    let msg = format!("Failed to create user_stat: {}", e);
+                    spacetimedb::log::error!("{}", msg);
+                    return Err(msg);
+                }
+            }
+
+            (1, 1, points, 1)
+        }
     };
 
-    let points_earned = base_points + (new_streak * bonus_per_day);
-    ctx.db.checkins().insert(CheckIn {
+    // Insert check-in record
+    let points_earned = 10 + (new_streak * 2);
+    let checkin = CheckIn {
         checkin_id: 0,
         user_identifier: user_identifier.clone(),
         username: username.clone(),
@@ -550,39 +734,27 @@ pub fn daily_checkin(
         checkin_date: now,
         points_earned,
         streak_count: new_streak,
-    });
+    };
 
-    ctx.db.logs().insert(LogEvent {
-        log_id: 0,
-        event_type: "daily_checkin".to_string(),
-        details: format!(
-            "user={} streak={} points_earned={} total_points={} total_checkins={} longest_streak={}",
-            user_identifier, new_streak, points_earned, total_points, total_checkins, longest_streak
-        ),
-        timestamp: now,
-    });
-}
-
-// --- Settings reducers ---
-#[reducer]
-pub fn save_setting(ctx: &ReducerContext, key: String, value: String) {
-    let ts = now_secs(ctx);
-    // delete existing if any
-    for row in ctx.db.settings().iter() {
-        if row.key == key {
-            ctx.db.settings().delete(row);
-            break;
+    match ctx.db.checkins().try_insert(checkin) {
+        Ok(inserted) => {
+            let details = format!(
+                "checkin_id={}, user={}, streak={}, points={}, total_points={}",
+                inserted.checkin_id, username, new_streak, points_earned, total_points
+            );
+            let _ = ctx.db.logs().try_insert(LogEvent {
+                log_id: 0,
+                event_type: "daily_checkin".to_string(),
+                details,
+                timestamp: now,
+            });
+            spacetimedb::log::info!("User {} checked in (streak: {}, points: {})", username, new_streak, points_earned);
+            Ok(())
         }
-    }
-    ctx.db.settings().insert(Setting { key, value, updated_at: ts });
-}
-
-#[reducer]
-pub fn delete_setting(ctx: &ReducerContext, key: String) {
-    for row in ctx.db.settings().iter() {
-        if row.key == key {
-            ctx.db.settings().delete(row);
-            break;
+        Err(e) => {
+            let msg = format!("Failed to insert check-in: {}", e);
+            spacetimedb::log::error!("{}", msg);
+            Err(msg)
         }
     }
 }

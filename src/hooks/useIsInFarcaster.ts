@@ -1,16 +1,18 @@
-"use client"
-import { useEffect, useState } from "react"
+import { useEffect, useState } from 'react'
+import { sdk } from '@farcaster/miniapp-sdk'
 
 export function useIsInFarcaster(): boolean {
-  const [isInFarcaster, setIsInFarcaster] = useState(false)
+  const [isIn, setIsIn] = useState(false)
   useEffect(() => {
-    try {
-      const ua = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
-      const inFrame = typeof window !== 'undefined' && window.top !== window.self
-      setIsInFarcaster(inFrame || ua.includes('farcaster'))
-    } catch {
-      setIsInFarcaster(false)
-    }
+    (async () => {
+      try {
+        await sdk.actions.ready()
+        await sdk.context
+        setIsIn(true)
+      } catch {
+        setIsIn(false)
+      }
+    })()
   }, [])
-  return isInFarcaster
+  return isIn
 }

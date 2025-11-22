@@ -1,58 +1,58 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useAccount, useDisconnect } from 'wagmi'
-import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { useSignIn, QRCode } from '@farcaster/auth-kit'
+import { QRCodeSVG } from 'qrcode.react'
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { base, arbitrum } from 'wagmi/chains'
 import { motion } from 'framer-motion'
 
 export function SignInButton(): JSX.Element {
   const { user, authMode, isInFarcaster, signInWithNeynar, signInWithWallet, signOut, walletChain, setWalletChain } = useAuth()
   const [showDialog, setShowDialog] = useState<boolean>(false)
+  const [neynarUrl, setNeynarUrl] = useState<string>('')
   const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
-  const didAutoWalletRef = useRef(false)
   
   // Wagmi hooks for wallet connection
   const { address, isConnected } = useAccount()
+  const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
 
-  // Auto sign in when wallet connects (web only), guarded to avoid re-login after sign out
-  useEffect(() => {
-    if (didAutoWalletRef.current) return
-    if (!isConnected || !address || user) return
-    if (isInFarcaster) return // never auto wallet in mini app
+  // Auto sign in when wallet connects
+  if (isConnected && address && !user) {
+    signInWithWallet(address)
+  }
+
+  const handleNeynarSignIn = async (): Promise<void> => {
     try {
-      const skip = typeof window !== 'undefined' ? window.sessionStorage.getItem('bb_skip_auto_wallet') : null
-      if (skip === '1') return
-    } catch {}
-    didAutoWalletRef.current = true
-    void signInWithWallet(address)
-  }, [isConnected, address, user, isInFarcaster, signInWithWallet])
+      // Generate Neynar auth URL
+      const authUrl = `https://app.neynar.com/login?client_id=${process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin)}`
+      setNeynarUrl(authUrl)
+      
+      // Open in new window for OAuth flow
+      window.open(authUrl, '_blank', 'width=500,height=700')
+      
+      await signInWithNeynar()
+    } catch (error) {
+      console.error('Neynar sign in failed:', error)
+    }
+  }
 
-  // Farcaster AuthKit sign-in
-  const { signIn, url, isConnected: isAuthKitConnected, isSuccess, data } = useSignIn({
-    onSuccess: ({ fid, username, displayName, pfpUrl }) => {
-      void signInWithNeynar({ fid, username, displayName, pfpUrl })
+  const handleWalletConnect = (connectorId: string): void => {
+    const connector = connectors.find((c) => c.id === connectorId)
+    if (connector) {
+      setWalletChain(selectedChain)
+      connect({ connector, chainId: selectedChain === 'base' ? base.id : arbitrum.id })
       setShowDialog(false)
-    },
-  })
-
-  // RainbowKit handles wallet connection via ConnectButton
+    }
+  }
 
   const handleSignOut = (): void => {
-    try {
-      // prevent auto wallet relogin this session
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem('bb_skip_auto_wallet', '1')
-      }
-    } catch {}
     signOut()
     if (isConnected) {
       disconnect()
@@ -108,17 +108,45 @@ export function SignInButton(): JSX.Element {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Auth options (shown when not authenticated) */}
-          <Tabs defaultValue="neynar" className="w-full">
-              <TabsList className={`grid w-full ${!isInFarcaster ? 'grid-cols-2' : 'grid-cols-1'} bg-gray-800`}>
+          {user ? (
+            // Authenticated - Show profile and sign out
+            <Card className="glass-card-dark border-green-500/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <img 
+                    src={user.pfpUrl} 
+                    alt={user.username}
+                    className="w-16 h-16 rounded-full ring-2 ring-green-500"
+                  />
+                  <div>
+                    <p className="font-bold text-lg">{user.displayName}</p>
+                    <p className="text-sm text-gray-400">@{user.username}</p>
+                    <Badge variant="outline" className="mt-1 bg-green-500/20 text-green-300 border-green-400/50">
+                      {authMode === 'farcaster-sdk' && '🟣 Farcaster Mini App'}
+                      {authMode === 'neynar' && '🔵 Neynar Web'}
+                      {authMode === 'wallet' && `💰 ${walletChain?.toUpperCase()}`}
+                    </Badge>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleSignOut}
+                  variant="destructive"
+                  className="w-full"
+                >
+                  Sign Out
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            // Not authenticated - Show auth options
+            <Tabs defaultValue="neynar" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-gray-800">
                 <TabsTrigger value="neynar" className="text-white">
-                  🟣 Farcaster
+                  🟣 Farcaster (Web)
                 </TabsTrigger>
-                {!isInFarcaster && (
-                  <TabsTrigger value="wallet" className="text-white">
-                    💰 Wallet
-                  </TabsTrigger>
-                )}
+                <TabsTrigger value="wallet" className="text-white">
+                  💰 Wallet
+                </TabsTrigger>
               </TabsList>
 
               {/* Neynar Tab */}
@@ -132,16 +160,26 @@ export function SignInButton(): JSX.Element {
                       </p>
                     </div>
 
-                    {!url && (
-                      <Button onClick={() => signIn()} className="w-full bg-purple-600 hover:bg-purple-700">
+                    {neynarUrl ? (
+                      <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="flex justify-center p-4 bg-white rounded-xl"
+                      >
+                        <QRCodeSVG 
+                          value={neynarUrl} 
+                          size={200}
+                          level="H"
+                          includeMargin
+                        />
+                      </motion.div>
+                    ) : (
+                      <Button
+                        onClick={handleNeynarSignIn}
+                        className="w-full bg-purple-600 hover:bg-purple-700"
+                      >
                         Generate QR Code
                       </Button>
-                    )}
-
-                    {url && (
-                      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex justify-center p-4 bg-white rounded-xl">
-                        <QRCode uri={url} size={200} />
-                      </motion.div>
                     )}
 
                     <div className="text-xs text-gray-500 text-center">
@@ -152,7 +190,6 @@ export function SignInButton(): JSX.Element {
               </TabsContent>
 
               {/* Wallet Tab */}
-              {!isInFarcaster && (
               <TabsContent value="wallet" className="space-y-4">
                 <Card className="glass-card-dark border-blue-500/30">
                   <CardContent className="pt-6 space-y-4">
@@ -163,8 +200,40 @@ export function SignInButton(): JSX.Element {
                       </p>
                     </div>
 
-                    <div className="flex justify-center">
-                      <ConnectButton chainStatus="icon" showBalance={false} />
+                    {/* Chain Selector */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Select Network</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          onClick={() => setSelectedChain('base')}
+                          variant={selectedChain === 'base' ? 'default' : 'outline'}
+                          className={selectedChain === 'base' ? 'bg-blue-600' : 'border-gray-700'}
+                        >
+                          🔵 Base
+                        </Button>
+                        <Button
+                          onClick={() => setSelectedChain('arbitrum')}
+                          variant={selectedChain === 'arbitrum' ? 'default' : 'outline'}
+                          className={selectedChain === 'arbitrum' ? 'bg-blue-600' : 'border-gray-700'}
+                        >
+                          🔵 Arbitrum
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Wallet Connectors */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Choose Wallet</label>
+                      {connectors.map((connector) => (
+                        <Button
+                          key={connector.id}
+                          onClick={() => handleWalletConnect(connector.id)}
+                          variant="outline"
+                          className="w-full border-gray-700 hover:bg-gray-800"
+                        >
+                          {connector.name}
+                        </Button>
+                      ))}
                     </div>
 
                     <div className="text-xs text-gray-500 text-center">
@@ -173,8 +242,8 @@ export function SignInButton(): JSX.Element {
                   </CardContent>
                 </Card>
               </TabsContent>
-              )}
             </Tabs>
+          )}
         </DialogContent>
       </Dialog>
     </>
