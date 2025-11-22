@@ -16,10 +16,6 @@
           "value": "ALLOWALL"
         },
         {
-          "key": "Content-Security-Policy",
-          "value": "connect-src 'self' wss://maincloud.spacetimedb.com"
-        },
-        {
           "key": "Access-Control-Allow-Origin",
           "value": "*"
         },
