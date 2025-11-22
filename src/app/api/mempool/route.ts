@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 
 interface BlockInfo {
   id: string
@@ -251,9 +251,82 @@ export async function GET(request: Request): Promise<Response> {
         { status: 503 }
       )
     }
+    if (action === 'block-by-height') {
+      const heightStr = searchParams.get('height')
+      if (!heightStr) {
+        return NextResponse.json(
+          { error: 'Missing height parameter' },
+          { status: 400 }
+        )
+      }
+      const height = parseInt(heightStr, 10)
+      if (!Number.isFinite(height) || height <= 0) {
+        return NextResponse.json(
+          { error: 'Invalid height parameter' },
+          { status: 400 }
+        )
+      }
 
+      let attempts = 0
+      const maxAttempts = 3
+      let lastError: Error | null = null
+
+      while (attempts < maxAttempts) {
+        try {
+          // 1) Resolve hash
+          const hashRes = await fetch(
+            `https://mempool.space/api/block-height/${height}`,
+            { method: 'GET', headers: { 'Accept': 'text/plain' }, signal: AbortSignal.timeout(10000) }
+          )
+          if (!hashRes.ok) throw new Error(`block-height returned ${hashRes.status}`)
+          const blockHash = await hashRes.text()
+
+          // 2) Fetch block details for tx_count + timestamp
+          const blockRes = await fetch(
+            `https://mempool.space/api/block/${blockHash}`,
+            { method: 'GET', headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(10000) }
+          )
+          if (!blockRes.ok) throw new Error(`block details returned ${blockRes.status}`)
+          const block = await blockRes.json() as { tx_count?: number, timestamp?: number }
+
+          // 3) If tx_count missing, fallback to /txids length
+          let txCount = typeof block.tx_count === 'number' ? block.tx_count : undefined
+          if (typeof txCount !== 'number') {
+            const txidsRes = await fetch(
+              `https://mempool.space/api/block/${blockHash}/txids`,
+              { method: 'GET', headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(15000) }
+            )
+            if (!txidsRes.ok) throw new Error(`txids returned ${txidsRes.status}`)
+            const txids = await txidsRes.json() as string[]
+            txCount = txids.length
+          }
+
+          return NextResponse.json({
+            blockHash,
+            txCount,
+            height,
+            timestamp: typeof block.timestamp === 'number' ? block.timestamp : undefined
+          })
+        } catch (error) {
+          lastError = error as Error
+          attempts++
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts))
+          }
+        }
+      }
+
+      return NextResponse.json(
+        {
+          error: 'Failed to resolve block by height after multiple attempts',
+          details: lastError?.message || 'Unknown error',
+          status: 'pending_result'
+        },
+        { status: 503 }
+      )
+    }
     return NextResponse.json(
-      { error: 'Invalid action parameter. Use: block-at-time, tx-count, recent-blocks, or recent-txs' },
+      { error: 'Invalid action parameter. Use: block-at-time, tx-count, block-by-height, recent-blocks, or recent-txs' },
       { status: 400 }
     )
   } catch (error) {
@@ -267,3 +340,4 @@ export async function GET(request: Request): Promise<Response> {
     )
   }
 }
+

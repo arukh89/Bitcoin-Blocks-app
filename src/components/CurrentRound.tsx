@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -90,9 +90,9 @@ export function CurrentRound(): JSX.Element {
   // Round number from admin input
   const roundNumber = activeRound?.roundNumber?.toString() || '—'
   
-  // Block number: Prioritize admin input, fallback to latest from mempool
-  const displayBlockNumber = activeRound?.blockNumber || blockNumber || 875420
-  const displayTxCount = txCount || 0
+  // Block number: Prioritize admin input, fallback to latest from mempool; else N/A
+  const displayBlockNumber: number | null = (activeRound?.blockNumber ?? blockNumber) ?? null
+  const displayTxCount: number | null = txCount ?? null
 
   // If not connected, show connecting state
   if (!connected) {
@@ -189,9 +189,9 @@ export function CurrentRound(): JSX.Element {
                 <div className="text-center space-y-1">
                   <p className="text-[10px] lg:text-xs text-blue-300 font-semibold">🧱 Target Block</p>
                   <p className="text-xl lg:text-2xl font-black text-blue-400 font-mono">
-                    #{displayBlockNumber.toLocaleString()}
+                    {displayBlockNumber !== null ? `#${displayBlockNumber.toLocaleString()}` : 'N/A'}
                   </p>
-                  <p className="text-[9px] lg:text-[10px] text-gray-400">Txs: {displayTxCount.toLocaleString()}</p>
+                  <p className="text-[9px] lg:text-[10px] text-gray-400">Txs: {displayTxCount !== null ? displayTxCount.toLocaleString() : 'N/A'}</p>
                 </div>
               </div>
 
