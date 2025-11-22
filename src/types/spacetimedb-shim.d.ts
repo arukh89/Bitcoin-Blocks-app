@@ -10,7 +10,7 @@ declare module 'spacetimedb' {
   export class DbConnectionImpl { constructor(...args: any[]) }
   export class Identity { constructor(...args: any[]) }
   export class SubscriptionBuilderImpl { constructor(...args: any[]) }
-  export class TableCache { constructor(...args: any[]) }
+  export class TableCache<T = any> { constructor(...args: any[]) }
   export class TimeDuration { constructor(...args: any[]) }
   export class Timestamp { constructor(...args: any[]) }
   export function deepEqual(a: any, b: any): boolean
