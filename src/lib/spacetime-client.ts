@@ -1,5 +1,6 @@
-﻿// Real SpacetimeDB client connection using official SDK
-import { DbConnection, type RemoteTables, type RemoteReducers } from '@/spacetime_module_bindings/index'
+﻿// Real SpacetimeDB client connection using official SDK (client-only)
+import 'client-only'
+import type { DbConnection as DbConnType, RemoteTables, RemoteReducers } from '@/spacetime_module_bindings/index'
 
 // SpacetimeDB connection settings
 // IMPORTANT: Module must be published to SpacetimeDB Maincloud using CLI
@@ -8,7 +9,7 @@ import { DbConnection, type RemoteTables, type RemoteReducers } from '@/spacetim
 const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || 'wss://maincloud.spacetimedb.com'
 const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || 'bitcoin-blocks-app-v2'
 
-let dbConnection: DbConnection | null = null
+let dbConnection: DbConnType | null = null
 let isConnecting = false
 let connectionError: string | null = null
 let retryCount = 0
@@ -17,7 +18,10 @@ const MAX_RETRIES = 3
 export async function connectToSpacetime(opts?: {
   onConnect?: () => void
   onDisconnect?: () => void
-}): Promise<DbConnection> {
+}): Promise<DbConnType> {
+  if (typeof window === 'undefined') {
+    throw new Error('Spacetime client can only run in the browser')
+  }
   // Return existing connection if available
   if (dbConnection) {
     console.log('♻️ Reusing existing SpacetimeDB connection')
@@ -48,6 +52,7 @@ export async function connectToSpacetime(opts?: {
       setTimeout(() => reject(new Error('Connection timeout after 10 seconds')), 10000)
     })
 
+    const { DbConnection } = await import('@/spacetime_module_bindings/index')
     const connectionPromise = DbConnection.builder()
       .withUri(SPACETIME_HOST)
       .withModuleName(SPACETIME_DB_NAME)
@@ -120,7 +125,7 @@ export async function connectToSpacetime(opts?: {
   }
 }
 
-export function getDbConnection(): DbConnection | null {
+export function getDbConnection(): DbConnType | null {
   return dbConnection
 }
 
@@ -132,4 +137,4 @@ export function isConnectionReady(): boolean {
   return dbConnection !== null && !isConnecting
 }
 
-export type { DbConnection, RemoteTables, RemoteReducers }
+export type { DbConnType as DbConnection, RemoteTables, RemoteReducers }
