@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import type { Round, Guess, Log, User, ChatMessage, PrizeConfiguration } from '@/types/game'
@@ -32,6 +32,11 @@ interface GameContextType {
   addChatMessage: (message: ChatMessage) => void
   connected: boolean
   client: DbConnection | null
+  // Settings
+  settings: Record<string, string>
+  getSetting: (k: string, def?: string) => string | undefined
+  getInt: (k: string, def: number) => number
+  getBool: (k: string, def: boolean) => boolean
   // Check-in functions
   checkIn: (userIdentifier: string, username: string, pfpUrl: string) => Promise<CheckInResult>
   userStats: UserStats | null
@@ -137,10 +142,9 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   const [hasCheckedInToday, setHasCheckedInToday] = useState<boolean>(false)
   const [weeklyCheckInLeaderboard, setWeeklyCheckInLeaderboard] = useState<WeeklyLeaderboardEntry[]>([])
   const [initSnapshotDone, setInitSnapshotDone] = useState<boolean>(false)
+  const [settings, setSettings] = useState<Record<string, string>>({})
 
   const activeRound = rounds.find(r => r.status === 'open') || null
-
-  // Authentication is now handled by AuthContext
 
   // ===========================================
   // DATABASE CONNECTION (REALTIME ONLY)
@@ -148,33 +152,84 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   useEffect(() => {
     let mounted = true
 
-    const initConnection = async (): Promise<void> => {
+    async function initConnection(): Promise<void> {
       try {
         console.log('🟢 Initializing REALTIME mode...')
         setConnected(false)
-        
+
         console.log('🔌 Connecting to SpacetimeDB...')
-        const conn = await connectToSpacetime()
-        
-        if (mounted) {
-          setClient(conn)
-          console.log('✅ SpacetimeDB Client connected')
-          setConnected(true)
-          console.log('✅ REALTIME Connection established!')
-          console.log('🟢 Database connection ready')
+        const conn = await connectToSpacetime({
+          onConnect: () => {
+            if (!mounted) return
+            setConnected(true)
+          },
+          onDisconnect: () => {
+            if (!mounted) return
+            setConnected(false)
+            setClient(null)
+            setInitSnapshotDone(false)
+            // Try to reconnect with backoff
+            setTimeout(() => { if (mounted) initConnection().catch(console.error) }, 2000)
+          }
+        })
+
+        if (!mounted) return
+
+        // Explicitly subscribe to all tables to ensure reliable updates
+        try {
+          // Newer SDKs expose subscribeToAllTables
+          ;(conn.subscriptionBuilder() as any).subscribeToAllTables?.()
+        } catch (e) {
+          console.warn('subscribeAllTables not available or failed', e)
         }
+
+        setClient(conn)
+        console.log('✅ SpacetimeDB Client connected')
+        setConnected(true)
+        console.log('✅ REALTIME Connection established!')
+        console.log('🟢 Database connection ready')
       } catch (error) {
         console.error('❌ Failed to connect to SpacetimeDB:', error)
         setConnected(false)
       }
     }
 
-    initConnection()
+    initConnection().catch(console.error)
 
     return () => {
       mounted = false
     }
   }, [])
+
+  // ===========================================
+  // Subscribe to settings table (key/value)
+  // ===========================================
+  useEffect(() => {
+    if (!client) return
+    const onInsert = (_ctx: any, row: any) => setSettings(prev => ({ ...prev, [row.key]: row.value }))
+    const onUpdate = (_ctx: any, _old: any, row: any) => setSettings(prev => ({ ...prev, [row.key]: row.value }))
+    ;(client.db as any).settings?.onInsert(onInsert)
+    ;(client.db as any).settings?.onUpdate(onUpdate)
+    const initial: Record<string, string> = {}
+    for (const row of ((client.db as any).settings?.iter() || [])) {
+      initial[row.key] = row.value
+    }
+    if (Object.keys(initial).length) setSettings(initial)
+    return () => {
+      try {
+        (client.db as any).settings?.removeOnInsert(onInsert)
+        (client.db as any).settings?.removeOnUpdate(onUpdate)
+      } catch {}
+    }
+  }, [client])
+
+  const getSetting = useCallback((k: string, def?: string) => settings[k] ?? def, [settings])
+  const getInt = useCallback((k: string, def: number) => {
+    const s = settings[k]; const n = s ? parseInt(s, 10) : NaN; return Number.isFinite(n) ? n : def
+  }, [settings])
+  const getBool = useCallback((k: string, def: boolean) => {
+    const s = (settings[k] || '').toLowerCase(); if (s === 'true' || s === '1') return true; if (s === 'false' || s === '0') return false; return def
+  }, [settings])
 
   // Force an initial snapshot to ensure caches are populated (FullUpdate)
   useEffect(() => {
@@ -198,7 +253,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to rounds table...')
 
-    const unsubscribe = client.db.rounds.onInsert((ctx, row) => {
+    const onInsertCb = (ctx: any, row: any) => {
       const converted = convertRound(row)
       console.log('➕ [REALTIME] New round inserted:', converted)
       setRounds(prev => {
@@ -206,20 +261,27 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
         if (exists) return prev
         return [...prev, converted]
       })
-    })
-
-    const unsubscribeUpdate = client.db.rounds.onUpdate((ctx, oldRow, newRow) => {
+    }
+    const onUpdateCb = (ctx: any, _oldRow: any, newRow: any) => {
       const converted = convertRound(newRow)
       console.log('🔄 [REALTIME] Round updated:', converted)
       setRounds(prev => prev.map(r => r.id === converted.id ? converted : r))
-    })
+    }
+
+    client.db.rounds.onInsert(onInsertCb)
+    client.db.rounds.onUpdate(onUpdateCb)
 
     // Load initial data
     const initialRounds = Array.from(client.db.rounds.iter()).map(convertRound)
     console.log('📥 [REALTIME] Initial rounds loaded:', initialRounds)
     setRounds(initialRounds)
 
-    return () => {}
+    return () => {
+      try {
+        client.db.rounds.removeOnInsert(onInsertCb)
+        client.db.rounds.removeOnUpdate(onUpdateCb)
+      } catch {}
+    }
   }, [client])
 
   // ===========================================
@@ -232,7 +294,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     console.log('📊 [REALTIME] Subscribing to user_stats and checkins tables...')
 
     // Subscribe to user_stats
-    const unsubscribeUserStats = (client.db as any).userStats.onInsert((ctx: any, row: any) => {
+    const onUserStatsInsert = (ctx: any, row: any) => {
       if (row.userIdentifier === user.address) {
         setUserStats({
           userIdentifier: row.userIdentifier,
@@ -247,9 +309,9 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
           updatedAt: Number(row.updatedAt) * 1000
         })
       }
-    })
+    }
 
-    const unsubscribeUserStatsUpdate = (client.db as any).userStats.onUpdate((ctx: any, oldRow: any, newRow: any) => {
+    const onUserStatsUpdate = (ctx: any, _oldRow: any, newRow: any) => {
       if (newRow.userIdentifier === user.address) {
         setUserStats({
           userIdentifier: newRow.userIdentifier,
@@ -264,7 +326,10 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
           updatedAt: Number(newRow.updatedAt) * 1000
         })
       }
-    })
+    }
+
+    ;(client.db as any).userStats.onInsert(onUserStatsInsert)
+    ;(client.db as any).userStats.onUpdate(onUserStatsUpdate)
 
     // Load initial user_stats
     for (const stat of (client.db as any).userStats.iter()) {
@@ -286,7 +351,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     // Subscribe to checkins
-    const unsubscribeCheckins = (client.db as any).checkins.onInsert((ctx: any, row: any) => {
+    const onCheckinsInsert = (ctx: any, row: any) => {
       if (row.userIdentifier === user.address) {
         setCheckInRecords(prev => [{
           checkinId: String(row.checkinId),
@@ -298,7 +363,9 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
           streakCount: Number(row.streakCount)
         }, ...prev])
       }
-    })
+    }
+
+    ;(client.db as any).checkins.onInsert(onCheckinsInsert)
 
     // Load initial checkins
     const userCheckins: CheckInRecord[] = []
@@ -317,7 +384,13 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
     setCheckInRecords(userCheckins)
 
-    return () => {}
+    return () => {
+      try {
+        (client.db as any).userStats.removeOnInsert(onUserStatsInsert)
+        (client.db as any).userStats.removeOnUpdate(onUserStatsUpdate)
+        (client.db as any).checkins.removeOnInsert(onCheckinsInsert)
+      } catch {}
+    }
   }, [client, user])
 
   // Check if user has checked in today
@@ -346,7 +419,8 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     const now = Date.now() / 1000
-    const weekAgo = now - (7 * 86400)
+    const windowDays = getInt('checkin_week_window_days', 7)
+    const weekAgo = now - (windowDays * 86400)
     const userMap = new Map<string, WeeklyLeaderboardEntry>()
 
     // Count check-ins in last 7 days
@@ -387,7 +461,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       .slice(0, 10)
 
     setWeeklyCheckInLeaderboard(leaderboard)
-  }, [client, checkInRecords])
+  }, [client, checkInRecords, getInt])
 
   // ===========================================
   // Subscribe to guesses table
@@ -397,7 +471,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to guesses table...')
 
-    const unsubscribe = client.db.guesses.onInsert((ctx, row) => {
+    const onInsertCb = (ctx: any, row: any) => {
       const converted = convertGuess(row)
       console.log('➕ [REALTIME] New guess inserted:', converted)
       setGuesses(prev => {
@@ -405,14 +479,18 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
         if (exists) return prev
         return [...prev, converted]
       })
-    })
+    }
+
+    client.db.guesses.onInsert(onInsertCb)
 
     // Load initial data
     const initialGuesses = Array.from(client.db.guesses.iter()).map(convertGuess)
     console.log('📥 [REALTIME] Initial guesses loaded:', initialGuesses.length, 'guesses')
     setGuesses(initialGuesses)
 
-    return () => {}
+    return () => {
+      try { client.db.guesses.removeOnInsert(onInsertCb) } catch {}
+    }
   }, [client])
 
   // ===========================================
@@ -421,20 +499,22 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
   useEffect(() => {
     if (!client) return
 
-    const unsubscribe = client.db.logs.onInsert((ctx, row) => {
+    const onInsertCb = (ctx: any, row: any) => {
       const converted = convertLog(row)
       setLogs(prev => {
         const exists = prev.find(l => l.id === converted.id)
         if (exists) return prev
         return [...prev, converted]
       })
-    })
+    }
+
+    client.db.logs.onInsert(onInsertCb)
 
     // Load initial data
     const initialLogs = Array.from(client.db.logs.iter()).map(convertLog)
     setLogs(initialLogs)
 
-    return () => {}
+    return () => { try { client.db.logs.removeOnInsert(onInsertCb) } catch {} }
   }, [client])
 
   // ===========================================
@@ -445,7 +525,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to chat messages table...')
 
-    const unsubscribe = client.db.chatMessages.onInsert((ctx, row) => {
+    const onInsertCb = (ctx: any, row: any) => {
       const converted = convertChatMsg(row)
       console.log('➕ [REALTIME] New chat message:', converted)
       setChatMessages(prev => {
@@ -453,14 +533,16 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
         if (exists) return prev
         return [converted, ...prev].slice(0, 100)
       })
-    })
+    }
+
+    client.db.chatMessages.onInsert(onInsertCb)
 
     // Load initial data
     const initialChat = Array.from(client.db.chatMessages.iter()).map(convertChatMsg)
     console.log('📥 [REALTIME] Initial chat messages loaded:', initialChat.length, 'messages')
     setChatMessages(initialChat.sort((a, b) => b.timestamp - a.timestamp).slice(0, 100))
 
-    return () => {}
+    return () => { try { client.db.chatMessages.removeOnInsert(onInsertCb) } catch {} }
   }, [client])
 
   // ===========================================
@@ -471,17 +553,20 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
 
     console.log('📊 [REALTIME] Subscribing to prize config table...')
 
-    const unsubscribe = client.db.prizeConfig.onInsert((ctx, row) => {
+    const onInsertCb = (ctx: any, row: any) => {
       const converted = convertPrizeConfig(row)
       console.log('➕ [REALTIME] New prize config:', converted)
       setPrizeConfig(converted)
-    })
+    }
 
-    const unsubscribeUpdate = client.db.prizeConfig.onUpdate((ctx, oldRow, newRow) => {
+    const onUpdateCb = (ctx: any, _oldRow: any, newRow: any) => {
       const converted = convertPrizeConfig(newRow)
       console.log('🔄 [REALTIME] Prize config updated:', converted)
       setPrizeConfig(converted)
-    })
+    }
+
+    client.db.prizeConfig.onInsert(onInsertCb)
+    client.db.prizeConfig.onUpdate(onUpdateCb)
 
     // Load initial data
     const initialConfigs = Array.from(client.db.prizeConfig.iter()).map(convertPrizeConfig)
@@ -490,7 +575,12 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
       setPrizeConfig(initialConfigs[0])
     }
 
-    return () => {}
+    return () => {
+      try {
+        client.db.prizeConfig.removeOnInsert(onInsertCb)
+        client.db.prizeConfig.removeOnUpdate(onUpdateCb)
+      } catch {}
+    }
   }, [client])
 
   // ===========================================
@@ -664,20 +754,7 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     }
   }, [client, connected])
 
-  // Auto-close rounds when end time is reached
-  useEffect(() => {
-    if (!activeRound || !client || !connected) return
-
-    const checkRoundEnd = (): void => {
-      const now = Date.now()
-      if (activeRound.status === 'open' && now >= activeRound.endTime) {
-        endRound(activeRound.id).catch(console.error)
-      }
-    }
-
-    const interval = setInterval(checkRoundEnd, 1000)
-    return () => clearInterval(interval)
-  }, [activeRound, client, connected, endRound])
+  // NOTE: Removed client-side auto-close timer; server tick_rounds is the source of truth
 
   // Check-in function
   const checkIn = useCallback(async (
@@ -728,6 +805,10 @@ export function GameProvider({ children }: { children: ReactNode }): JSX.Element
     addChatMessage,
     connected,
     client,
+    settings,
+    getSetting,
+    getInt,
+    getBool,
     checkIn,
     userStats,
     hasCheckedInToday,

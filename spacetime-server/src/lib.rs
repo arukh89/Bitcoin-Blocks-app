@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+﻿#![allow(unused_imports)]
 #![allow(dead_code)]
 
 // Bitcoin Blocks SpacetimeDB module (maincloud)
@@ -7,6 +7,16 @@
 use spacetimedb::{reducer, table, ReducerContext, Table, Timestamp, ScheduleAt};
 use core::time::Duration;
 use std::time::UNIX_EPOCH;
+
+// Key/Value settings for dynamic content and rules
+#[table(name = settings, public)]
+#[derive(Clone, Debug)]
+pub struct Setting {
+    #[primary_key]
+    pub key: String,
+    pub value: String,
+    pub updated_at: i64,
+}
 
 // Check-ins: daily points + streaks
 #[table(name = checkins, public)]
@@ -143,6 +153,21 @@ fn now_secs(ctx: &ReducerContext) -> i64 {
 
 fn day_start(ts: i64) -> i64 { ts - (ts % 86_400) }
 
+fn get_setting(ctx: &ReducerContext, k: &str) -> Option<String> {
+    for s in ctx.db.settings().iter() {
+        if s.key == k { return Some(s.value.clone()); }
+    }
+    None
+}
+
+fn parse_i64(s: Option<String>, def: i64) -> i64 {
+    s.and_then(|x| x.parse::<i64>().ok()).unwrap_or(def)
+}
+
+fn parse_bool(s: Option<String>, def: bool) -> bool {
+    match s { Some(x) => x == "true" || x == "1", None => def }
+}
+
 #[reducer]
 pub fn create_round(
     ctx: &ReducerContext,
@@ -162,6 +187,26 @@ pub fn create_round(
         ctx.db.round_timer().insert(RoundTimer {
             scheduled_id: 0,
             scheduled_at: ScheduleAt::Interval(Duration::from_secs(5).into()),
+        });
+    }
+
+    // Close any existing open rounds to enforce a single-open invariant
+    let mut closed_any = false;
+    for r in ctx.db.rounds().iter() {
+        if r.status == "open" {
+            let mut u = r.clone();
+            u.status = "closed".to_string();
+            ctx.db.rounds().delete(r);
+            ctx.db.rounds().insert(u);
+            closed_any = true;
+        }
+    }
+    if closed_any {
+        ctx.db.logs().insert(LogEvent {
+            log_id: 0,
+            event_type: "enforce_single_open_round".to_string(),
+            details: format!("auto_closed_previous at {}", start),
+            timestamp: start,
         });
     }
 
@@ -194,6 +239,32 @@ pub fn init(ctx: &ReducerContext) {
             scheduled_at: ScheduleAt::Interval(Duration::from_secs(5).into()),
         });
     }
+
+    // Seed default settings if missing
+    let defaults: [(&str, &str); 14] = [
+        ("homepage_title", "Bitcoin Blocks"),
+        ("homepage_tagline", "Predicting Bitcoin’s Next Block"),
+        ("metadata_title", "Bitcoin Blocks"),
+        ("metadata_description", "Predict Bitcoin transactions & compete!"),
+        ("announce_template_round_start", "🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m"),
+        ("announce_template_results", "📊 Block #{block} had {txCount} txs. 🥇 @{winner}"),
+        ("admin_poll_interval_seconds", "30"),
+        ("guess_min", "1"),
+        ("guess_max", "20000"),
+        ("require_fid_for_guess", "true"),
+        ("admin_announce_requires_fid", "true"),
+        ("checkin_base_points", "10"),
+        ("checkin_streak_bonus_per_day", "2"),
+        ("checkin_week_window_days", "7"),
+    ];
+
+    for (k, v) in defaults {
+        let mut exists = false;
+        for s in ctx.db.settings().iter() { if s.key == k { exists = true; break; } }
+        if !exists {
+            ctx.db.settings().insert(Setting { key: k.into(), value: v.into(), updated_at: now_secs(ctx) });
+        }
+    }
 }
 
 // Scheduled reducer: close any rounds whose end_time has passed
@@ -225,12 +296,18 @@ pub fn tick_rounds(ctx: &ReducerContext, _timer: RoundTimer) {
 #[reducer]
 pub fn end_round_manually(ctx: &ReducerContext, round_id: u64) {
     // Mark the round as closed (lock submissions)
+    let mut changed = false;
     for r in ctx.db.rounds().iter() {
         if r.round_id == round_id {
-            let mut updated = r.clone();
-            updated.status = "closed".to_string();
-            ctx.db.rounds().delete(r);
-            ctx.db.rounds().insert(updated);
+            if r.status == "closed" || r.status == "finished" {
+                // idempotent
+            } else {
+                let mut updated = r.clone();
+                updated.status = "closed".to_string();
+                ctx.db.rounds().delete(r);
+                ctx.db.rounds().insert(updated);
+                changed = true;
+            }
             break;
         }
     }
@@ -240,7 +317,7 @@ pub fn end_round_manually(ctx: &ReducerContext, round_id: u64) {
     ctx.db.logs().insert(LogEvent {
         log_id: 0,
         event_type: "end_round_manually".to_string(),
-        details: format!("round_id={}", round_id),
+        details: format!("round_id={} changed={}", round_id, changed),
         timestamp: ts,
     });
 }
@@ -268,16 +345,12 @@ pub fn save_prize_config(
     for existing in ctx.db.prize_config().iter() {
         ctx.db.prize_config().delete(existing);
     }
-
-    // Enforce canonical currency per product decision
-    let enforced_currency = "$Seconds".to_string();
-
     let row = PrizeConfig {
         config_id: 1,
         jackpot_amount,
         first_place_amount,
         second_place_amount,
-        currency_type: enforced_currency,
+        currency_type,
         updated_at,
     };
     ctx.db.prize_config().insert(row);
@@ -316,6 +389,33 @@ pub fn submit_guess(
     pfp_url: Option<String>,
 ) {
     let ts = now_secs(ctx);
+
+    // Find the round
+    let mut round_opt: Option<Round> = None;
+    for r in ctx.db.rounds().iter() {
+        if r.round_id == round_id { round_opt = Some(r.clone()); break; }
+    }
+    if round_opt.is_none() {
+        return;
+    }
+    let r = round_opt.unwrap();
+
+    // Guard: round must be open and not expired
+    if r.status != "open" { return; }
+    if ts >= r.end_time { return; }
+
+    // Guard: only one guess per fid per round
+    for g in ctx.db.guesses().iter() {
+        if g.round_id == round_id && g.fid == fid {
+            return;
+        }
+    }
+
+    // Guard: enforce min/max guess range from settings
+    let min = parse_i64(get_setting(ctx, "guess_min"), 1);
+    let max = parse_i64(get_setting(ctx, "guess_max"), 20_000);
+    if guess < min || guess > max { return; }
+
     ctx.db.guesses().insert(Guess {
         guess_id: 0, // auto_inc
         round_id,
@@ -400,11 +500,15 @@ pub fn daily_checkin(
         }
     }
 
+    // Dynamic points configuration
+    let base_points = parse_i64(get_setting(ctx, "checkin_base_points"), 10);
+    let bonus_per_day = parse_i64(get_setting(ctx, "checkin_streak_bonus_per_day"), 2);
+
     let (new_streak, total_checkins, total_points, longest_streak) = if let Some(mut s) = existing {
         let last_day = day_start(s.last_checkin_date);
         let yesterday = today - 86_400;
         let new_streak = if last_day == yesterday { s.current_streak + 1 } else if last_day < yesterday { 1 } else { s.current_streak };
-        let points = 10 + (new_streak * 2);
+        let points = base_points + (new_streak * bonus_per_day);
         s.current_streak = new_streak;
         s.total_points += points;
         if s.current_streak > s.longest_streak { s.longest_streak = s.current_streak; }
@@ -419,7 +523,7 @@ pub fn daily_checkin(
         ctx.db.user_stats().insert(s.clone());
         (new_streak, s.total_checkins, s.total_points, s.longest_streak)
     } else {
-        let points = 10 + 2; // base + day-1 bonus
+        let points = base_points + bonus_per_day; // base + first day bonus
         let s = UserStat {
             stat_id: 0,
             user_identifier: user_identifier.clone(),
@@ -437,7 +541,7 @@ pub fn daily_checkin(
         (1, 1, points, 1)
     };
 
-    let points_earned = 10 + (new_streak * 2);
+    let points_earned = base_points + (new_streak * bonus_per_day);
     ctx.db.checkins().insert(CheckIn {
         checkin_id: 0,
         user_identifier: user_identifier.clone(),
@@ -457,4 +561,28 @@ pub fn daily_checkin(
         ),
         timestamp: now,
     });
+}
+
+// --- Settings reducers ---
+#[reducer]
+pub fn save_setting(ctx: &ReducerContext, key: String, value: String) {
+    let ts = now_secs(ctx);
+    // delete existing if any
+    for row in ctx.db.settings().iter() {
+        if row.key == key {
+            ctx.db.settings().delete(row);
+            break;
+        }
+    }
+    ctx.db.settings().insert(Setting { key, value, updated_at: ts });
+}
+
+#[reducer]
+pub fn delete_setting(ctx: &ReducerContext, key: String) {
+    for row in ctx.db.settings().iter() {
+        if row.key == key {
+            ctx.db.settings().delete(row);
+            break;
+        }
+    }
 }

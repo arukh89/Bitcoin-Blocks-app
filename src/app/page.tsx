@@ -32,7 +32,7 @@ export default function Home(): JSX.Element {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false)
-  const { activeRound, getGuessesForRound, connected, prizeConfig } = useGame()
+  const { activeRound, getGuessesForRound, connected, prizeConfig, getSetting } = useGame()
   const { user } = useAuth()
     const { addMiniApp } = useAddMiniApp();
     const isInFarcaster = useIsInFarcaster()
@@ -149,11 +149,11 @@ export default function Home(): JSX.Element {
                   >
                     🛠️
                   </span>
-                  Bitcoin Blocks
+                  {getSetting('homepage_title', 'Bitcoin Blocks')}
                 </motion.h1>
                 <p className="text-orange-300 text-sm font-medium flex items-center gap-2">
                   <span className="inline-block w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
-                  Predicting Bitcoin&apos;s Next Block
+                  {getSetting("homepage_tagline", "Predicting Bitcoin’s Next Block")}
                 </p>
               </div>
               

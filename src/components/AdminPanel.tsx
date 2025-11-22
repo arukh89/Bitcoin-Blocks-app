@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast'
 // Removed APP_CONFIG - using pure realtime mode
 
 export function AdminPanel(): JSX.Element {
-  const { createRound, endRound, updateRoundResult, activeRound, rounds, getGuessesForRound, connected, client, prizeConfig, addChatMessage } = useGame()
+  const { createRound, endRound, updateRoundResult, activeRound, rounds, getGuessesForRound, connected, client, prizeConfig, addChatMessage, getSetting, getInt, getBool } = useGame()
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
@@ -36,15 +36,15 @@ export function AdminPanel(): JSX.Element {
       setJackpotAmount(String(prizeConfig.jackpotAmount))
       setFirstPrize(String(prizeConfig.firstPlaceAmount))
       setSecondPrize(String(prizeConfig.secondPlaceAmount))
-      setPrizeCurrency('$Seconds')
+      setPrizeCurrency(prizeConfig.currencyType || '$Seconds')
     } else {
       // Set defaults if no config exists
       setJackpotAmount('5000')
       setFirstPrize('1000')
       setSecondPrize('500')
-      setPrizeCurrency('$Seconds')
+      setPrizeCurrency(getSetting('default_currency', '$Seconds') || '$Seconds')
     }
-  }, [prizeConfig])
+  }, [prizeConfig, getSetting])
 
   // Only show to admin users (check already done in parent, but double-check for safety)
   if (!user?.isAdmin) {
@@ -135,10 +135,14 @@ export function AdminPanel(): JSX.Element {
       setLoading(true)
       await createRound(roundNum, now, endTime, prize, blockNum, durationMin)
       
-      // Announce to Global Chat (FID only)
-      const farcasterPrize = `${jackpotAmount} ${'$Seconds'}`
-      const message = `🔔 Round #${roundNum} Started!\n\nGuess how many transactions will be in the next Bitcoin block ⛏️\n\n💰 Jackpot: ${farcasterPrize}\n🎯 Target Block: #${blockNum}\n⏱ Duration: ${durationMin} minutes\n\n#BitcoinBlocks`
-      await handleAnnounce(message)
+      // Announce to Global Chat using template
+      const tpl = getSetting('announce_template_round_start', '🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m') || '🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m'
+      const msg = tpl
+        .replace('{round}', String(roundNum))
+        .replace('{jackpot}', `${jackpotAmount} ${prizeCurrency}`)
+        .replace('{block}', `#${blockNum}`)
+        .replace('{duration}', String(durationMin))
+      await handleAnnounce(msg)
       
       toast({
         title: '✅ Round Started',
@@ -274,10 +278,12 @@ export function AdminPanel(): JSX.Element {
 
       await updateRoundResult(closedRound.id, actualTxCount, blockHash, winner.address)
 
-      // Announce results to Global Chat (FID only)
-      const newJackpot = `${jackpotAmount} ${prizeCurrency}`
-      const message = `📊 Block #${closedRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\n\n🥇 Winner: @${winner.username}\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\n\n💰 Jackpot is now: ${newJackpot}\n\n#BitcoinBlocks`
-      
+      // Announce results using template
+      const tpl = getSetting('announce_template_results', '📊 Block #{block} had {txCount} txs. 🥇 @{winner}') || '📊 Block #{block} had {txCount} txs. 🥇 @{winner}'
+      const message = tpl
+        .replace('{block}', `#${closedRound.blockNumber}`)
+        .replace('{txCount}', actualTxCount.toLocaleString())
+        .replace('{winner}', winner.username)
       await handleAnnounce(message)
 
       toast({
@@ -302,8 +308,9 @@ export function AdminPanel(): JSX.Element {
     }
 
     try {
-      // Only allow FID-based accounts to announce
-      if (!user.address.startsWith('fid-')) return
+      // Gate by FID-only depending on setting (default true)
+      const requiresFid = getBool('admin_announce_requires_fid', true)
+      if (requiresFid && !user.address.startsWith('fid-')) return
 
       const chatMsg: ChatMessage = {
         id: `sys-${Date.now()}`,
@@ -420,7 +427,8 @@ export function AdminPanel(): JSX.Element {
       }
     }
     
-    // Poll every 30 seconds
+    // Poll interval from settings (seconds)
+    const pollSec = Math.max(5, getInt('admin_poll_interval_seconds', 30))
     const interval = setInterval(async () => {
       if (!activeRound || activeRound.status !== 'open') {
         clearInterval(interval)
@@ -454,7 +462,7 @@ export function AdminPanel(): JSX.Element {
           }, 2000)
         }
       }
-    }, 30000) // Check every 30 seconds
+    }, pollSec * 1000)
     
     // Initial check
     const available = await checkBlock()
@@ -726,8 +734,7 @@ export function AdminPanel(): JSX.Element {
                   name="prizeCurrency"
                   placeholder="$Seconds"
                   value={prizeCurrency}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency('$Seconds')}
-                  disabled
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency(e.target.value)}
                   className="bg-gray-800/50 border-gray-600/50 text-white"
                 />
               </div>
@@ -754,6 +761,61 @@ export function AdminPanel(): JSX.Element {
             <p className="text-sm text-cyan-300">
               <span className="font-bold">ℹ️ Auto-Announcement:</span> Starting rounds and posting results will automatically announce in Global Chat with formatted messages.
             </p>
+          </div>
+
+          {/* Site Settings */}
+          <div className="glass-card p-6 rounded-2xl space-y-4 border border-amber-500/30">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">⚙️</span>
+              <h3 className="text-base font-bold text-white">Site Settings</h3>
+            </div>
+            <p className="text-xs text-gray-400">Edit dynamic texts and rules. Changes apply live.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-gray-300 text-sm">Homepage Title</Label>
+                <Input defaultValue={getSetting('homepage_title', 'Bitcoin Blocks')} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('homepage_title', e.target.value.trim()); toast({ title: 'Saved', description: 'homepage_title updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Homepage Tagline</Label>
+                <Input defaultValue={getSetting('homepage_tagline', 'Predicting Bitcoin’s Next Block')} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('homepage_tagline', e.target.value.trim()); toast({ title: 'Saved', description: 'homepage_tagline updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Start Template</Label>
+                <Input defaultValue={getSetting('announce_template_round_start', '🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m')} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('announce_template_round_start', e.target.value.trim()); toast({ title: 'Saved', description: 'announce_template_round_start updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Results Template</Label>
+                <Input defaultValue={getSetting('announce_template_results', '📊 Block #{block} had {txCount} txs. 🥇 @{winner}')} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('announce_template_results', e.target.value.trim()); toast({ title: 'Saved', description: 'announce_template_results updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Admin Poll Interval (s)</Label>
+                <Input type="number" defaultValue={String(getInt('admin_poll_interval_seconds', 30))} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('admin_poll_interval_seconds', String(Math.max(5, parseInt(e.target.value || '30', 10)))); toast({ title: 'Saved', description: 'admin_poll_interval_seconds updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Guess Min</Label>
+                <Input type="number" defaultValue={String(getInt('guess_min', 1))} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('guess_min', String(parseInt(e.target.value || '1', 10))); toast({ title: 'Saved', description: 'guess_min updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Guess Max</Label>
+                <Input type="number" defaultValue={String(getInt('guess_max', 20000))} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('guess_max', String(parseInt(e.target.value || '20000', 10))); toast({ title: 'Saved', description: 'guess_max updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Require FID for Guess</Label>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" defaultChecked={getBool('require_fid_for_guess', true)} onChange={async (e) => { await (client?.reducers as any)?.saveSetting('require_fid_for_guess', e.target.checked ? 'true' : 'false'); toast({ title: 'Saved', description: 'require_fid_for_guess updated' }) }} />
+                  <span className="text-xs text-gray-400">Farcaster-only guessing</span>
+                </div>
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Check-in Base Points</Label>
+                <Input type="number" defaultValue={String(getInt('checkin_base_points', 10))} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('checkin_base_points', String(parseInt(e.target.value || '10', 10))); toast({ title: 'Saved', description: 'checkin_base_points updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+              <div>
+                <Label className="text-gray-300 text-sm">Check-in Streak Bonus / Day</Label>
+                <Input type="number" defaultValue={String(getInt('checkin_streak_bonus_per_day', 2))} onBlur={async (e) => { await (client?.reducers as any)?.saveSetting('checkin_streak_bonus_per_day', String(parseInt(e.target.value || '2', 10))); toast({ title: 'Saved', description: 'checkin_streak_bonus_per_day updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
