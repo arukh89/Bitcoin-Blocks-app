@@ -7,21 +7,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { QRCodeSVG } from 'qrcode.react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useAccount, useDisconnect } from 'wagmi'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useSignIn, QRCode } from '@farcaster/auth-kit'
 import { base, arbitrum } from 'wagmi/chains'
 import { motion } from 'framer-motion'
 
 export function SignInButton(): JSX.Element {
   const { user, authMode, isInFarcaster, signInWithNeynar, signInWithWallet, signOut, walletChain, setWalletChain } = useAuth()
   const [showDialog, setShowDialog] = useState<boolean>(false)
-  const [neynarUrl, setNeynarUrl] = useState<string>('')
   const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
   const didAutoWalletRef = useRef(false)
   
   // Wagmi hooks for wallet connection
   const { address, isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
 
   // Auto sign in when wallet connects (web only), guarded to avoid re-login after sign out
@@ -37,29 +36,15 @@ export function SignInButton(): JSX.Element {
     void signInWithWallet(address)
   }, [isConnected, address, user, isInFarcaster, signInWithWallet])
 
-  const handleNeynarSignIn = async (): Promise<void> => {
-    try {
-      // Generate Neynar auth URL
-      const authUrl = `https://app.neynar.com/login?client_id=${process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin)}`
-      setNeynarUrl(authUrl)
-      
-      // Open in new window for OAuth flow
-      window.open(authUrl, '_blank', 'width=500,height=700')
-      
-      await signInWithNeynar()
-    } catch (error) {
-      console.error('Neynar sign in failed:', error)
-    }
-  }
-
-  const handleWalletConnect = (connectorId: string): void => {
-    const connector = connectors.find((c) => c.id === connectorId)
-    if (connector) {
-      setWalletChain(selectedChain)
-      connect({ connector, chainId: selectedChain === 'base' ? base.id : arbitrum.id })
+  // Farcaster AuthKit sign-in
+  const { signIn, url, isConnected: isAuthKitConnected, isSuccess, data } = useSignIn({
+    onSuccess: ({ fid, username, displayName, pfpUrl }) => {
+      void signInWithNeynar({ fid, username, displayName, pfpUrl })
       setShowDialog(false)
-    }
-  }
+    },
+  })
+
+  // RainbowKit handles wallet connection via ConnectButton
 
   const handleSignOut = (): void => {
     try {
@@ -147,26 +132,16 @@ export function SignInButton(): JSX.Element {
                       </p>
                     </div>
 
-                    {neynarUrl ? (
-                      <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="flex justify-center p-4 bg-white rounded-xl"
-                      >
-                        <QRCodeSVG 
-                          value={neynarUrl} 
-                          size={200}
-                          level="H"
-                          includeMargin
-                        />
-                      </motion.div>
-                    ) : (
-                      <Button
-                        onClick={handleNeynarSignIn}
-                        className="w-full bg-purple-600 hover:bg-purple-700"
-                      >
+                    {!url && (
+                      <Button onClick={() => signIn()} className="w-full bg-purple-600 hover:bg-purple-700">
                         Generate QR Code
                       </Button>
+                    )}
+
+                    {url && (
+                      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex justify-center p-4 bg-white rounded-xl">
+                        <QRCode uri={url} size={200} />
+                      </motion.div>
                     )}
 
                     <div className="text-xs text-gray-500 text-center">
@@ -188,40 +163,8 @@ export function SignInButton(): JSX.Element {
                       </p>
                     </div>
 
-                    {/* Chain Selector */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Select Network</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          onClick={() => setSelectedChain('base')}
-                          variant={selectedChain === 'base' ? 'default' : 'outline'}
-                          className={selectedChain === 'base' ? 'bg-blue-600' : 'border-gray-700'}
-                        >
-                          🔵 Base
-                        </Button>
-                        <Button
-                          onClick={() => setSelectedChain('arbitrum')}
-                          variant={selectedChain === 'arbitrum' ? 'default' : 'outline'}
-                          className={selectedChain === 'arbitrum' ? 'bg-blue-600' : 'border-gray-700'}
-                        >
-                          🔵 Arbitrum
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Wallet Connectors */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Choose Wallet</label>
-                      {connectors.map((connector) => (
-                        <Button
-                          key={connector.id}
-                          onClick={() => handleWalletConnect(connector.id)}
-                          variant="outline"
-                          className="w-full border-gray-700 hover:bg-gray-800"
-                        >
-                          {connector.name}
-                        </Button>
-                      ))}
+                    <div className="flex justify-center">
+                      <ConnectButton chainStatus="icon" showBalance={false} />
                     </div>
 
                     <div className="text-xs text-gray-500 text-center">

@@ -34,7 +34,7 @@ interface AuthContextType {
   authMode: AuthMode | null
   isAuthenticated: boolean
   isInFarcaster: boolean
-  signInWithNeynar: () => Promise<void>
+  signInWithNeynar: (profile?: { fid: number, username?: string | null, displayName?: string | null, pfpUrl?: string | null }) => Promise<void>
   signInWithWallet: (address: string) => Promise<void>
   signOut: () => void
   logout: () => void
@@ -102,17 +102,29 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   // ===========================================
   // NEYNAR SIGN IN (Web Context)
   // ===========================================
-  const signInWithNeynar = useCallback(async (): Promise<void> => {
+  const signInWithNeynar = useCallback(async (profile?: { fid: number, username?: string | null, displayName?: string | null, pfpUrl?: string | null }): Promise<void> => {
     try {
-      console.log('🔐 Starting Neynar authentication...')
-      
-      // Generate auth URL and redirect
-      // This will be implemented in SignInButton component
-      // using @neynar/react SDK
-      
+      console.log('🔐 Farcaster web auth (AuthKit) start')
+      if (profile && profile.fid) {
+        const fid = profile.fid
+        const isAdmin = isAdminFid(fid)
+        const fcUser: User = {
+          address: `fid-${fid}`,
+          username: (profile.username || profile.displayName || `user${fid}`) ?? `user${fid}`,
+          displayName: (profile.displayName || profile.username || `user${fid}`) ?? `user${fid}`,
+          pfpUrl: profile.pfpUrl || 'https://i.imgur.com/placeholder.jpg',
+          isAdmin
+        }
+        setUser(fcUser)
+        setUserFid(fid)
+        setAuthMode('neynar')
+        console.log('✅ Farcaster web auth success:', { fid, isAdmin })
+        return
+      }
+      // If no profile provided, just mark intent; UI should call again with profile data
       setAuthMode('neynar')
     } catch (error) {
-      console.error('❌ Neynar auth failed:', error)
+      console.error('❌ Farcaster web auth failed:', error)
       throw error
     }
   }, [])
