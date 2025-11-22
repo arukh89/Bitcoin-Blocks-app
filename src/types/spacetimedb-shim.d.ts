@@ -10,7 +10,17 @@ declare module 'spacetimedb' {
   export class DbConnectionImpl { constructor(...args: any[]) }
   export class Identity { constructor(...args: any[]) }
   export class SubscriptionBuilderImpl { constructor(...args: any[]) }
-  export class TableCache<T = any> { constructor(...args: any[]) }
+  export class TableCache<T = any> {
+    constructor(...args: any[])
+    count(): number
+    iter(): Iterable<T>
+    onInsert(cb: (ctx: any, row: T) => void): any
+    removeOnInsert(cb: (ctx: any, row: T) => void): any
+    onDelete(cb: (ctx: any, row: T) => void): any
+    removeOnDelete(cb: (ctx: any, row: T) => void): any
+    onUpdate(cb: (ctx: any, oldRow: T, newRow: T) => void): any
+    removeOnUpdate(cb: (ctx: any, oldRow: T, newRow: T) => void): any
+  }
   export class TimeDuration { constructor(...args: any[]) }
   export class Timestamp { constructor(...args: any[]) }
   export function deepEqual(a: any, b: any): boolean
