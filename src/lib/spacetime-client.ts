@@ -1,26 +1,30 @@
-﻿// Real SpacetimeDB client connection using official SDK (client-only)
-import 'client-only'
-import type { DbConnection as DbConnType, RemoteTables, RemoteReducers } from '@/spacetime_module_bindings/index'
+// Real SpacetimeDB client connection using official SDK
+import { DbConnection, type RemoteTables, type RemoteReducers } from '@/spacetime_module_bindings'
 
 // SpacetimeDB connection settings
-// IMPORTANT: Module must be published to SpacetimeDB Maincloud using CLI
-// Using Maincloud (production-ready database)
-// Instructions: See DEPLOYMENT_GUIDE.md
-const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || 'wss://maincloud.spacetimedb.com'
-const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || 'bitcoin-blocks-app-v2'
+// IMPORTANT:
+// - Do NOT hardcode host or module name. They must come from environment variables.
+// - Required envs (client-safe):
+//     NEXT_PUBLIC_SPACETIME_HOST
+//     NEXT_PUBLIC_SPACETIME_DB_NAME
+const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST
+const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME
 
-let dbConnection: DbConnType | null = null
+let dbConnection: DbConnection | null = null
 let isConnecting = false
 let connectionError: string | null = null
 let retryCount = 0
 const MAX_RETRIES = 3
 
-export async function connectToSpacetime(opts?: {
-  onConnect?: () => void
-  onDisconnect?: () => void
-}): Promise<DbConnType> {
-  if (typeof window === 'undefined') {
-    throw new Error('Spacetime client can only run in the browser')
+export async function connectToSpacetime(): Promise<DbConnection> {
+  if (!SPACETIME_HOST || !SPACETIME_DB_NAME) {
+    const missing = [
+      !SPACETIME_HOST ? 'NEXT_PUBLIC_SPACETIME_HOST' : null,
+      !SPACETIME_DB_NAME ? 'NEXT_PUBLIC_SPACETIME_DB_NAME' : null,
+    ].filter(Boolean)
+    const msg = `Missing required Spacetime env: ${missing.join(', ')}`
+    console.error(msg)
+    throw new Error(msg)
   }
   // Return existing connection if available
   if (dbConnection) {
@@ -52,22 +56,35 @@ export async function connectToSpacetime(opts?: {
       setTimeout(() => reject(new Error('Connection timeout after 10 seconds')), 10000)
     })
 
-    const { DbConnection } = await import('@/spacetime_module_bindings/index')
     const connectionPromise = DbConnection.builder()
       .withUri(SPACETIME_HOST)
       .withModuleName(SPACETIME_DB_NAME)
-      .onConnect((_token: unknown, identity: unknown, address: unknown) => {
+      .onConnect((token, identity, address) => {
         console.log('✅ Connected to SpacetimeDB')
         console.log('Identity:', identity)
         console.log('Address:', address)
         retryCount = 0 // Reset retry count on successful connection
         connectionError = null
-        try { opts?.onConnect?.() } catch (e) { console.warn('onConnect callback error', e) }
       })
-      .onDisconnect((_closeCode: unknown, _closeReason: unknown) => {
+      .onDisconnect((closeCode, closeReason) => {
         console.log('❌ Disconnected from SpacetimeDB')
+        console.log('Code:', closeCode, 'Reason:', closeReason)
         dbConnection = null
-        try { opts?.onDisconnect?.() } catch (e) { console.warn('onDisconnect callback error', e) }
+        
+        // Attempt to reconnect if not a clean disconnect
+        if (closeCode !== 1000 && retryCount < MAX_RETRIES) {
+          console.log('🔄 Attempting to reconnect...')
+          setTimeout(() => {
+            retryCount++
+            connectToSpacetime().catch(err => {
+              console.error('Reconnection failed:', err)
+            })
+          }, 2000 * (retryCount + 1)) // Exponential backoff
+        }
+      })
+      .onError((error) => {
+        console.error('⚠️ SpacetimeDB Error:', error)
+        connectionError = error instanceof Error ? error.message : 'Unknown error'
       })
       .build()
     
@@ -87,12 +104,11 @@ export async function connectToSpacetime(opts?: {
     console.error('❌ Failed to connect to SpacetimeDB:', error)
     
     // Provide helpful error messages
-    const isMaincloud = SPACETIME_HOST.includes('maincloud')
-    const isTestnet = SPACETIME_HOST.includes('testnet')
+    const isCloud = /spacetimedb\.com/.test(SPACETIME_HOST)
     
     if (errorMsg.includes('timeout')) {
       console.error('\n⚠️ CONNECTION TIMEOUT')
-      console.error(`The SpacetimeDB module may not be published to ${isMaincloud ? 'maincloud' : isTestnet ? 'testnet' : 'the server'}.`)
+      console.error('The SpacetimeDB module may not be published to the configured server.')
     } else if (errorMsg.includes('404') || errorMsg.includes('not found')) {
       console.error('\n⚠️ MODULE NOT FOUND')
       console.error(`Module "${SPACETIME_DB_NAME}" does not exist on ${SPACETIME_HOST}`)
@@ -102,16 +118,9 @@ export async function connectToSpacetime(opts?: {
     }
     
     console.error('\n📖 TO FIX THIS:')
-    console.error(`1. Install SpacetimeDB CLI: curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh`)
-    
-    if (isMaincloud) {
-      console.error('2. Publish to maincloud: cd spacetime-server && spacetime publish', SPACETIME_DB_NAME, '--server maincloud')
-    } else if (isTestnet) {
-      console.error('2. Publish to testnet: cd spacetime-server && spacetime publish --host testnet.spacetimedb.com', SPACETIME_DB_NAME)
-    } else {
-      console.error('2. Publish module: cd spacetime-server && spacetime publish', SPACETIME_DB_NAME)
-      console.error('3. Or use a local instance: spacetime start')
-    }
+    console.error('1. Ensure envs are set: NEXT_PUBLIC_SPACETIME_HOST and NEXT_PUBLIC_SPACETIME_DB_NAME')
+    console.error('2. Install SpacetimeDB CLI and publish your module (see docs).')
+    console.error(`   Example: cd spacetime-server && spacetime publish ${isCloud ? '--host ' + new URL(SPACETIME_HOST).host : ''} <YOUR_DB_NAME>`) 
     
     console.error('\nFor detailed instructions, see: DEPLOYMENT_GUIDE.md\n')
     
@@ -125,7 +134,7 @@ export async function connectToSpacetime(opts?: {
   }
 }
 
-export function getDbConnection(): DbConnType | null {
+export function getDbConnection(): DbConnection | null {
   return dbConnection
 }
 
@@ -137,4 +146,4 @@ export function isConnectionReady(): boolean {
   return dbConnection !== null && !isConnecting
 }
 
-export type { DbConnType as DbConnection, RemoteTables, RemoteReducers }
+export type { DbConnection, RemoteTables, RemoteReducers }
