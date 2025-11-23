@@ -16,7 +16,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { CheckInLeaderboard } from '@/components/CheckInLeaderboard'
 // Removed APP_CONFIG - using pure realtime mode
 
-export default function AdminPage(): JSX.Element {
+export default function AdminPage() {
   const router = useRouter()
   const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected, addChatMessage } = useGame()
   const { user } = useAuth()
@@ -506,7 +506,7 @@ export default function AdminPage(): JSX.Element {
                     type="text"
                     placeholder="$Seconds"
                     value={jackpotCurrency}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJackpotCurrency('$Seconds')}
+                  onChange={(_e: React.ChangeEvent<HTMLInputElement>) => setJackpotCurrency('$Seconds')}
                     disabled
                     className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-500"
                   />
@@ -542,7 +542,7 @@ export default function AdminPage(): JSX.Element {
                   type="text"
                   placeholder="$Seconds"
                   value={prizeCurrency}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency('$Seconds')}
+                  onChange={(_e: React.ChangeEvent<HTMLInputElement>) => setPrizeCurrency('$Seconds')}
                   disabled
                   className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-500"
                 />

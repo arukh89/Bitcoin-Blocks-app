@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { useGame } from '@/context/GameContext'
 import type { ChatMessage } from '@/types/game'
 import { useAuth } from '@/context/AuthContext'
@@ -274,7 +273,6 @@ export function AdminPanel() {
       })
 
       const winner = sorted[0]
-      const runnerUp = sorted[1]
 
       await updateRoundResult(closedRound.id, actualTxCount, blockHash, winner.address)
 

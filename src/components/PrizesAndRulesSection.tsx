@@ -1,5 +1,4 @@
 'use client'
-import type React from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -13,7 +12,7 @@ export default function PrizesAndRulesSection({
   firstPrize = '—',
   secondPrize = '—',
   currency = '—'
-}: PrizesAndRulesSectionProps): React.ReactElement {
+}: PrizesAndRulesSectionProps) {
   return (
     <motion.div
       initial={{ y: 20, opacity: 0 }}
