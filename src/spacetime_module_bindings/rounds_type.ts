@@ -10,7 +10,7 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.object("Round", {
+export default __t.object("Rounds", {
   roundId: __t.u64(),
   roundNumber: __t.i64(),
   startTime: __t.i64(),

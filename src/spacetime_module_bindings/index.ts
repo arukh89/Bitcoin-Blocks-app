@@ -74,24 +74,24 @@ import UserStatsRow from "./user_stats_table";
 export { UserStatsRow };
 
 // Import and reexport all types
-import ChatMessage from "./chat_message_type";
-export { ChatMessage };
-import CheckIn from "./check_in_type";
-export { CheckIn };
-import Guess from "./guess_type";
-export { Guess };
-import LogEvent from "./log_event_type";
-export { LogEvent };
+import ChatMessages from "./chat_messages_type";
+export { ChatMessages };
+import Checkins from "./checkins_type";
+export { Checkins };
+import Guesses from "./guesses_type";
+export { Guesses };
+import Logs from "./logs_type";
+export { Logs };
 import PrizeConfig from "./prize_config_type";
 export { PrizeConfig };
-import Round from "./round_type";
-export { Round };
 import RoundTimer from "./round_timer_type";
 export { RoundTimer };
-import Setting from "./setting_type";
-export { Setting };
-import UserStat from "./user_stat_type";
-export { UserStat };
+import Rounds from "./rounds_type";
+export { Rounds };
+import Settings from "./settings_type";
+export { Settings };
+import UserStats from "./user_stats_type";
+export { UserStats };
 
 
 const tablesSchema = __schema(
@@ -105,7 +105,7 @@ const tablesSchema = __schema(
     constraints: [
       { name: 'chat_messages_chat_id_key', constraint: 'unique', columns: ['chat_id'] },
     ],
-  }, ChatMessageRow),
+  }, ChatMessagesRow),
   __table({
     name: 'checkins',
     indexes: [
@@ -116,7 +116,7 @@ const tablesSchema = __schema(
     constraints: [
       { name: 'checkins_checkin_id_key', constraint: 'unique', columns: ['checkin_id'] },
     ],
-  }, CheckInRow),
+  }, CheckinsRow),
   __table({
     name: 'guesses',
     indexes: [
@@ -127,7 +127,7 @@ const tablesSchema = __schema(
     constraints: [
       { name: 'guesses_guess_id_key', constraint: 'unique', columns: ['guess_id'] },
     ],
-  }, GuessRow),
+  }, GuessesRow),
   __table({
     name: 'logs',
     indexes: [
@@ -138,7 +138,7 @@ const tablesSchema = __schema(
     constraints: [
       { name: 'logs_log_id_key', constraint: 'unique', columns: ['log_id'] },
     ],
-  }, LogEventRow),
+  }, LogsRow),
   __table({
     name: 'prize_config',
     indexes: [
@@ -171,7 +171,7 @@ const tablesSchema = __schema(
     constraints: [
       { name: 'rounds_round_id_key', constraint: 'unique', columns: ['round_id'] },
     ],
-  }, RoundRow),
+  }, RoundsRow),
   __table({
     name: 'settings',
     indexes: [
@@ -182,7 +182,7 @@ const tablesSchema = __schema(
     constraints: [
       { name: 'settings_key_key', constraint: 'unique', columns: ['key'] },
     ],
-  }, SettingRow),
+  }, SettingsRow),
   __table({
     name: 'user_stats',
     indexes: [
@@ -197,7 +197,7 @@ const tablesSchema = __schema(
       { name: 'user_stats_stat_id_key', constraint: 'unique', columns: ['stat_id'] },
       { name: 'user_stats_user_identifier_key', constraint: 'unique', columns: ['user_identifier'] },
     ],
-  }, UserStatRow),
+  }, UserStatsRow),
 );
 
 const reducersSchema = __reducers(

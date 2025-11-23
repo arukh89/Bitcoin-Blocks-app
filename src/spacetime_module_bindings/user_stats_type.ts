@@ -10,14 +10,18 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.object("Guess", {
-  guessId: __t.u64(),
-  roundId: __t.u64(),
-  fid: __t.i64(),
+export default __t.object("UserStats", {
+  statId: __t.u64(),
+  userIdentifier: __t.string(),
   username: __t.string(),
-  guess: __t.i64(),
-  pfpUrl: __t.option(__t.string()),
-  submittedAt: __t.i64(),
+  pfpUrl: __t.string(),
+  totalPoints: __t.i64(),
+  currentStreak: __t.i64(),
+  longestStreak: __t.i64(),
+  lastCheckinDate: __t.i64(),
+  totalCheckins: __t.i64(),
+  createdAt: __t.i64(),
+  updatedAt: __t.i64(),
 });
 
 

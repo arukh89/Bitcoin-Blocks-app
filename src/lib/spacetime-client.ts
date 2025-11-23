@@ -1,6 +1,6 @@
 // Real SpacetimeDB client connection using official SDK (client-only)
 import 'client-only'
-import type { DbConnection as DbConnType, RemoteTables, RemoteReducers } from '@/spacetime_module_bindings'
+import type { DbConnection as DbConnType } from '@/spacetime_module_bindings'
 
 // SpacetimeDB connection settings
 // IMPORTANT: Module must be published to SpacetimeDB Maincloud using CLI
@@ -148,4 +148,4 @@ export function isConnectionReady(): boolean {
   return dbConnection !== null && !isConnecting
 }
 
-export type { DbConnType as DbConnection, RemoteTables, RemoteReducers }
+export type { DbConnType as DbConnection }

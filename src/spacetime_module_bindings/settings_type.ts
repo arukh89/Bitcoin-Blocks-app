@@ -10,11 +10,10 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.object("LogEvent", {
-  logId: __t.u64(),
-  eventType: __t.string(),
-  details: __t.string(),
-  timestamp: __t.i64(),
+export default __t.object("Settings", {
+  key: __t.string(),
+  value: __t.string(),
+  updatedAt: __t.i64(),
 });
 
 

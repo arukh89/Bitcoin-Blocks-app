@@ -10,14 +10,15 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.object("CheckIn", {
-  checkinId: __t.u64(),
-  userIdentifier: __t.string(),
+export default __t.object("ChatMessages", {
+  chatId: __t.u64(),
+  roundId: __t.string(),
+  address: __t.string(),
   username: __t.string(),
+  message: __t.string(),
   pfpUrl: __t.string(),
-  checkinDate: __t.i64(),
-  pointsEarned: __t.i64(),
-  streakCount: __t.i64(),
+  timestamp: __t.i64(),
+  msgType: __t.string(),
 });
 
 

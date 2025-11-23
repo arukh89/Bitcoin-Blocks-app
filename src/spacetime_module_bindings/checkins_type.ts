@@ -10,10 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.object("Setting", {
-  key: __t.string(),
-  value: __t.string(),
-  updatedAt: __t.i64(),
+export default __t.object("Checkins", {
+  checkinId: __t.u64(),
+  userIdentifier: __t.string(),
+  username: __t.string(),
+  pfpUrl: __t.string(),
+  checkinDate: __t.i64(),
+  pointsEarned: __t.i64(),
+  streakCount: __t.i64(),
 });
 
 
