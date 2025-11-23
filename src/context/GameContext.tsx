@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import type { Round, Guess, Log, User, ChatMessage, PrizeConfiguration } from '@/types/game'
+import type { Round, Guess, Log, ChatMessage, PrizeConfiguration } from '@/types/game'
 import type { UserStats, CheckInRecord, WeeklyLeaderboardEntry, CheckInResult } from '@/types/checkin'
 import { useAuth, ADMIN_FIDS, isAdminFid, isAdminWallet, ADMIN_WALLETS } from '@/context/AuthContext'
 
@@ -170,7 +170,7 @@ function convertPrizeConfig(p: STDBPrizeConfig): PrizeConfiguration {
 }
 
 export function GameProvider({ children }: { children: ReactNode }) {
-  const { user, userFid } = useAuth()
+  const { user } = useAuth()
   const [rounds, setRounds] = useState<Round[]>([])
   const [guesses, setGuesses] = useState<Guess[]>([])
   const [logs, setLogs] = useState<Log[]>([])

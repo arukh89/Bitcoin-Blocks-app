@@ -9,7 +9,6 @@ import { useGame } from '@/context/GameContext'
 export function CurrentRound() {
   const { activeRound, connected } = useGame()
   const [countdown, setCountdown] = useState<string>('0m 0s')
-  const [lastBlockTime, setLastBlockTime] = useState<number | null>(null)
   const [blockNumber, setBlockNumber] = useState<number | null>(null)
   const [txCount, setTxCount] = useState<number | null>(null)
 
@@ -28,7 +27,6 @@ export function CurrentRound() {
 
         const latest = Array.isArray(blocks) && blocks.length > 0 ? blocks[0] : null
         if (latest) {
-          setLastBlockTime(latest.timestamp * 1000) // Convert to milliseconds
           setBlockNumber(latest.height)
           setTxCount(latest.tx_count)
         }

@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+// import { useRouter } from 'next/navigation'
 
 import { SignInButton } from '@/components/SignInButton'
 import { GlobalChat } from '@/components/GlobalChat'
@@ -16,7 +16,7 @@ import { CurrentRound } from '@/components/CurrentRound'
 import PrizesAndRulesSection from '@/components/PrizesAndRulesSection'
 import { DailyCheckIn } from '@/components/DailyCheckIn'
 import { CheckInLeaderboard } from '@/components/CheckInLeaderboard'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
@@ -26,11 +26,10 @@ import { useAddMiniApp } from "@/hooks/useAddMiniApp";
 import { useQuickAuth } from "@/hooks/useQuickAuth";
 import { useIsInFarcaster } from "@/hooks/useIsInFarcaster";
 
-export default function Home(): JSX.Element {
-  const router = useRouter()
+export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false)
-  const { activeRound, getGuessesForRound, connected, prizeConfig, getSetting } = useGame()
+  const { connected, prizeConfig, getSetting } = useGame()
   const { user } = useAuth()
     const { addMiniApp } = useAddMiniApp();
     const isInFarcaster = useIsInFarcaster()
@@ -89,7 +88,7 @@ export default function Home(): JSX.Element {
     return () => clearTimeout(timer)
   }, [])
 
-  const participantCount = activeRound ? getGuessesForRound(activeRound.id).length : 0
+  // const participantCount = activeRound ? getGuessesForRound(activeRound.id).length : 0
   const jackpotText = prizeConfig
     ? `${Number(prizeConfig.jackpotAmount).toLocaleString()} ${prizeConfig.currencyType}`
     : `${(Number(getSetting('jackpot_default', '5000')) || 5000).toLocaleString()} ${getSetting('default_currency', '$Seconds')}`
