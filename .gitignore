@@ -20,3 +20,7 @@ pnpm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+ 
+# Spacetime server build artifacts
+spacetime-server/target
+spacetime-server/Cargo.lock
