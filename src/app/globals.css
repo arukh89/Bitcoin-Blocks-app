@@ -6,6 +6,10 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* Ensure variable-based utility classes exist for @apply usage */
+  .border-border { border-color: hsl(var(--border)); }
+  .bg-background { background-color: hsl(var(--background)); }
+  .text-foreground { color: hsl(var(--foreground)); }
   
   .glass-card {
     background: rgba(255, 255, 255, 0.1);

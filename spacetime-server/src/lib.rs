@@ -11,7 +11,7 @@ use std::time::UNIX_EPOCH;
 // Key/Value settings for dynamic content and rules
 #[table(name = settings, public)]
 #[derive(Clone, Debug)]
-pub struct Setting {
+pub struct Settings {
     #[primary_key]
     pub key: String,
     pub value: String,
@@ -21,7 +21,7 @@ pub struct Setting {
 // Check-ins: daily points + streaks
 #[table(name = checkins, public)]
 #[derive(Clone, Debug)]
-pub struct CheckIn {
+pub struct Checkins {
     #[primary_key]
     #[auto_inc]
     pub checkin_id: u64,
@@ -35,7 +35,7 @@ pub struct CheckIn {
 
 #[table(name = user_stats, public)]
 #[derive(Clone, Debug)]
-pub struct UserStat {
+pub struct UserStats {
     #[primary_key]
     #[auto_inc]
     pub stat_id: u64,
@@ -55,7 +55,7 @@ pub struct UserStat {
 // Chat messages table
 #[table(name = chat_messages, public)]
 #[derive(Clone, Debug)]
-pub struct ChatMessage {
+pub struct ChatMessages {
     #[primary_key]
     #[auto_inc]
     pub chat_id: u64,
@@ -71,7 +71,7 @@ pub struct ChatMessage {
 // User guesses table
 #[table(name = guesses, public)]
 #[derive(Clone, Debug)]
-pub struct Guess {
+pub struct Guesses {
     #[primary_key]
     #[auto_inc]
     pub guess_id: u64,
@@ -86,7 +86,7 @@ pub struct Guess {
 // Logs table (simple event log)
 #[table(name = logs, public)]
 #[derive(Clone, Debug)]
-pub struct LogEvent {
+pub struct Logs {
     #[primary_key]
     #[auto_inc]
     pub log_id: u64,
@@ -111,7 +111,7 @@ pub struct PrizeConfig {
 // Game rounds
 #[table(name = rounds, public)]
 #[derive(Clone, Debug)]
-pub struct Round {
+pub struct Rounds {
     #[primary_key]
     #[auto_inc]
     pub round_id: u64,
@@ -202,7 +202,7 @@ pub fn create_round(
         }
     }
     if closed_any {
-        ctx.db.logs().insert(LogEvent {
+            ctx.db.logs().insert(Logs {
             log_id: 0,
             event_type: "enforce_single_open_round".to_string(),
             details: format!("auto_closed_previous at {}", start),
@@ -210,15 +210,15 @@ pub fn create_round(
         });
     }
 
-    ctx.db.rounds().insert(Round {
+    ctx.db.rounds().insert(Rounds {
         round_id: 0, // auto_inc
-        round_number,
+        round_number: round_number,
         start_time: start,
         end_time: end,
-        duration_minutes,
+        duration_minutes: duration_minutes,
         prize,
         status: "open".to_string(),
-        block_number,
+        block_number: block_number,
         actual_tx_count: None,
         winning_fid: None,
         second_place_winner_fid: None,
@@ -262,7 +262,7 @@ pub fn init(ctx: &ReducerContext) {
         let mut exists = false;
         for s in ctx.db.settings().iter() { if s.key == k { exists = true; break; } }
         if !exists {
-            ctx.db.settings().insert(Setting { key: k.into(), value: v.into(), updated_at: now_secs(ctx) });
+            ctx.db.settings().insert(Settings { key: k.into(), value: v.into(), updated_at: now_secs(ctx) });
         }
     }
 }
@@ -284,7 +284,7 @@ pub fn tick_rounds(ctx: &ReducerContext, _timer: RoundTimer) {
     }
 
     if closed_count > 0 {
-        ctx.db.logs().insert(LogEvent {
+        ctx.db.logs().insert(Logs {
             log_id: 0,
             event_type: "auto_close_rounds".to_string(),
             details: format!("closed={} at {}", closed_count, now),
@@ -314,7 +314,7 @@ pub fn end_round_manually(ctx: &ReducerContext, round_id: u64) {
 
     // Log action
     let ts = now_secs(ctx);
-    ctx.db.logs().insert(LogEvent {
+    ctx.db.logs().insert(Logs {
         log_id: 0,
         event_type: "end_round_manually".to_string(),
         details: format!("round_id={} changed={}", round_id, changed),
@@ -347,11 +347,11 @@ pub fn save_prize_config(
     }
     let row = PrizeConfig {
         config_id: 1,
-        jackpot_amount,
-        first_place_amount,
-        second_place_amount,
-        currency_type,
-        updated_at,
+        jackpot_amount: jackpot_amount,
+        first_place_amount: first_place_amount,
+        second_place_amount: second_place_amount,
+        currency_type: currency_type,
+        updated_at: updated_at,
     };
     ctx.db.prize_config().insert(row);
 }
@@ -367,15 +367,15 @@ pub fn send_chat_message(
     msg_type: String,
 ) {
     let ts = now_secs(ctx);
-    ctx.db.chat_messages().insert(ChatMessage {
+    ctx.db.chat_messages().insert(ChatMessages {
         chat_id: 0, // auto_inc
-        round_id,
+        round_id: round_id,
         address,
         username,
         message,
-        pfp_url,
+        pfp_url: pfp_url,
         timestamp: ts,
-        msg_type,
+        msg_type: msg_type,
     });
 }
 
@@ -391,7 +391,7 @@ pub fn submit_guess(
     let ts = now_secs(ctx);
 
     // Find the round
-    let mut round_opt: Option<Round> = None;
+    let mut round_opt: Option<Rounds> = None;
     for r in ctx.db.rounds().iter() {
         if r.round_id == round_id { round_opt = Some(r.clone()); break; }
     }
@@ -416,13 +416,13 @@ pub fn submit_guess(
     let max = parse_i64(get_setting(ctx, "guess_max"), 20_000);
     if guess < min || guess > max { return; }
 
-    ctx.db.guesses().insert(Guess {
+    ctx.db.guesses().insert(Guesses {
         guess_id: 0, // auto_inc
-        round_id,
+        round_id: round_id,
         fid,
         username,
         guess,
-        pfp_url,
+        pfp_url: pfp_url,
         submitted_at: ts,
     });
 }
@@ -465,7 +465,7 @@ pub fn update_round_result(
             round_id, actual_tx_count, winning_fid
         )
     };
-    ctx.db.logs().insert(LogEvent {
+    ctx.db.logs().insert(Logs {
         log_id: 0,
         event_type: "update_round_result".to_string(),
         details,
@@ -492,7 +492,7 @@ pub fn daily_checkin(
     }
 
     // Load existing user stats (if any)
-    let mut existing: Option<UserStat> = None;
+    let mut existing: Option<UserStats> = None;
     for s in ctx.db.user_stats().iter() {
         if s.user_identifier == user_identifier {
             existing = Some(s.clone());
@@ -524,7 +524,7 @@ pub fn daily_checkin(
         (new_streak, s.total_checkins, s.total_points, s.longest_streak)
     } else {
         let points = base_points + bonus_per_day; // base + first day bonus
-        let s = UserStat {
+        let s = UserStats {
             stat_id: 0,
             user_identifier: user_identifier.clone(),
             username: username.clone(),
@@ -542,17 +542,17 @@ pub fn daily_checkin(
     };
 
     let points_earned = base_points + (new_streak * bonus_per_day);
-    ctx.db.checkins().insert(CheckIn {
+    ctx.db.checkins().insert(Checkins {
         checkin_id: 0,
         user_identifier: user_identifier.clone(),
         username: username.clone(),
         pfp_url: pfp_url.clone(),
         checkin_date: now,
-        points_earned,
+        points_earned: points_earned,
         streak_count: new_streak,
     });
 
-    ctx.db.logs().insert(LogEvent {
+    ctx.db.logs().insert(Logs {
         log_id: 0,
         event_type: "daily_checkin".to_string(),
         details: format!(
@@ -574,7 +574,7 @@ pub fn save_setting(ctx: &ReducerContext, key: String, value: String) {
             break;
         }
     }
-    ctx.db.settings().insert(Setting { key, value, updated_at: ts });
+    ctx.db.settings().insert(Settings { key, value, updated_at: ts });
 }
 
 #[reducer]

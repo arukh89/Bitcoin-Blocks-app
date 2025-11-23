@@ -1,6 +1,7 @@
 // Real SpacetimeDB client connection using official SDK (client-only)
 import 'client-only'
-import type { DbConnection as DbConnType, RemoteTables, RemoteReducers } from '@/spacetime_module_bindings'
+import type { DbConnection as DbConnType, ErrorContext } from '@/spacetime_module_bindings'
+import type { Identity } from 'spacetimedb'
 
 // SpacetimeDB connection settings
 // IMPORTANT: Module must be published to SpacetimeDB Maincloud using CLI
@@ -67,15 +68,14 @@ export async function connectToSpacetime(opts?: {
     const connectionPromise = DbConnection.builder()
       .withUri(HOST)
       .withModuleName(DB_NAME)
-      .onConnect((_token, identity, address) => {
+      .onConnect((_connection: DbConnType, identity: Identity, _token: string) => {
         console.log('✅ Connected to SpacetimeDB')
         console.log('Identity:', identity)
-        console.log('Address:', address)
         retryCount = 0 // Reset retry count on successful connection
         connectionError = null
         try { opts?.onConnect?.() } catch (e) { console.warn('onConnect callback error', e) }
       })
-      .onDisconnect((_closeCode, _closeReason) => {
+      .onDisconnect((_ctx: ErrorContext, _error?: Error) => {
         console.log('❌ Disconnected from SpacetimeDB')
         dbConnection = null
         try { opts?.onDisconnect?.() } catch (e) { console.warn('onDisconnect callback error', e) }
@@ -148,4 +148,4 @@ export function isConnectionReady(): boolean {
   return dbConnection !== null && !isConnecting
 }
 
-export type { DbConnType as DbConnection, RemoteTables, RemoteReducers }
+export type { DbConnType as DbConnection }

@@ -5,6 +5,7 @@ node_modules
 .next
 out
 next-env.d.ts
+tsconfig.tsbuildinfo
 
 # Env files
 .env
@@ -20,3 +21,7 @@ pnpm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+ 
+# Spacetime server build artifacts
+spacetime-server/target
+spacetime-server/Cargo.lock
