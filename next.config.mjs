@@ -7,7 +7,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'pbs.twimg.com' },
       // Allow Vercel Blob public images
       { protocol: 'https', hostname: 'blob.vercel-storage.com' },
-      { protocol: 'https', hostname: 'public.blob.vercel-storage.com' }
+      { protocol: 'https', hostname: 'public.blob.vercel-storage.com' },
+      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' }
     ]
   },
   webpack: (config) => {
