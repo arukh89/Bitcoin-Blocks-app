@@ -655,13 +655,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const blockNumBigInt = blockNumber !== undefined ? BigInt(blockNumber) : undefined
       
       console.log('📤 [REALTIME] Creating round...', { roundNumber, durationMinutes: durationMinutes.toString(), prize, blockNumber })
-      await (client as any).reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt)
+      await (client as any).reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt, (user?.address || ''))
       console.log('✅ [REALTIME] Round created successfully!')
     } catch (error) {
       console.error('❌ [REALTIME] Failed to create round:', error)
       throw error
     }
-  }, [client, connected])
+  }, [client, connected, user])
 
   const submitGuess = useCallback(async (
     roundId: string, 
@@ -734,14 +734,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await (client as any).reducers.endRoundManually(BigInt(roundId))
+      await (client as any).reducers.endRoundManually(BigInt(roundId), (user?.address || ''))
       console.log('✅ [REALTIME] Round ended!')
       return true
     } catch (error) {
       console.error('❌ [REALTIME] Failed to end round:', error)
       return false
     }
-  }, [client, connected, rounds])
+  }, [client, connected, rounds, user])
 
   const updateRoundResult = useCallback(async (
     roundId: string, 
@@ -766,11 +766,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       BigInt(roundId),
       BigInt(actualTxCount),
       blockHash,
-      BigInt(fidNum)
+      BigInt(fidNum),
+      (user?.address || '')
     )
     
     console.log('✅ [REALTIME] Round result updated!')
-  }, [client, connected])
+  }, [client, connected, user])
 
   const getGuessesForRound = useCallback((roundId: string): Guess[] => {
     return guesses.filter(g => g.roundId === roundId)
@@ -792,20 +793,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
     try {
       console.log('📤 [REALTIME] Sending chat message...')
       
+      const adminIdentifier = (message.type === 'system' || message.type === 'winner') ? (user?.address || '') : message.address
       await (client as any).reducers.sendChatMessage(
         message.roundId,
         message.address,
         message.username,
         message.message,
         message.pfpUrl || '',
-        message.type
+        message.type,
+        adminIdentifier
       )
       console.log('✅ [REALTIME] Chat message sent!')
     } catch (error) {
       console.error('❌ [REALTIME] Failed to send chat message:', error)
       throw error
     }
-  }, [client, connected])
+  }, [client, connected, user])
 
   // NOTE: Removed client-side auto-close timer; server tick_rounds is the source of truth
 
