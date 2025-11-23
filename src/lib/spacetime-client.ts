@@ -1,4 +1,4 @@
-﻿// Real SpacetimeDB client connection using official SDK (client-only)
+// Real SpacetimeDB client connection using official SDK (client-only)
 import 'client-only'
 import type { DbConnection as DbConnType, RemoteTables, RemoteReducers } from '@/spacetime_module_bindings'
 
