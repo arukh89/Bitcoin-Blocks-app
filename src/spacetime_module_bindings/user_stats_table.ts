@@ -4,22 +4,125 @@
 /* eslint-disable */
 /* tslint:disable */
 import {
-  TypeBuilder as __TypeBuilder,
-  t as __t,
-  type AlgebraicTypeType as __AlgebraicTypeType,
-  type Infer as __Infer,
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
+import { UserStats } from "./user_stats_type";
+import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
+declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
-export default __t.row({
-  statId: __t.u64().primaryKey(),
-  userIdentifier: __t.string(),
-  username: __t.string(),
-  pfpUrl: __t.string(),
-  totalPoints: __t.i64(),
-  currentStreak: __t.i64(),
-  longestStreak: __t.i64(),
-  lastCheckinDate: __t.i64(),
-  totalCheckins: __t.i64(),
-  createdAt: __t.i64(),
-  updatedAt: __t.i64(),
-});
+/**
+ * Table handle for the table `user_stats`.
+ *
+ * Obtain a handle from the [`userStats`] property on [`RemoteTables`],
+ * like `ctx.db.userStats`.
+ *
+ * Users are encouraged not to explicitly reference this type,
+ * but to directly chain method calls,
+ * like `ctx.db.userStats.on_insert(...)`.
+ */
+export class UserStatsTableHandle<TableName extends string> implements __TableHandle<TableName> {
+  // phantom type to track the table name
+  readonly tableName!: TableName;
+  tableCache: __TableCache<UserStats>;
+
+  constructor(tableCache: __TableCache<UserStats>) {
+    this.tableCache = tableCache;
+  }
+
+  count(): number {
+    return this.tableCache.count();
+  }
+
+  iter(): Iterable<UserStats> {
+    return this.tableCache.iter();
+  }
+  /**
+   * Access to the `statId` unique index on the table `user_stats`,
+   * which allows point queries on the field of the same name
+   * via the [`UserStatsStatIdUnique.find`] method.
+   *
+   * Users are encouraged not to explicitly reference this type,
+   * but to directly chain method calls,
+   * like `ctx.db.userStats.statId().find(...)`.
+   *
+   * Get a handle on the `statId` unique index on the table `user_stats`.
+   */
+  statId = {
+    // Find the subscribed row whose `statId` column value is equal to `col_val`,
+    // if such a row is present in the client cache.
+    find: (col_val: bigint): UserStats | undefined => {
+      for (let row of this.tableCache.iter()) {
+        if (__deepEqual(row.statId, col_val)) {
+          return row;
+        }
+      }
+    },
+  };
+  /**
+   * Access to the `userIdentifier` unique index on the table `user_stats`,
+   * which allows point queries on the field of the same name
+   * via the [`UserStatsUserIdentifierUnique.find`] method.
+   *
+   * Users are encouraged not to explicitly reference this type,
+   * but to directly chain method calls,
+   * like `ctx.db.userStats.userIdentifier().find(...)`.
+   *
+   * Get a handle on the `userIdentifier` unique index on the table `user_stats`.
+   */
+  userIdentifier = {
+    // Find the subscribed row whose `userIdentifier` column value is equal to `col_val`,
+    // if such a row is present in the client cache.
+    find: (col_val: string): UserStats | undefined => {
+      for (let row of this.tableCache.iter()) {
+        if (__deepEqual(row.userIdentifier, col_val)) {
+          return row;
+        }
+      }
+    },
+  };
+
+  onInsert = (cb: (ctx: EventContext, row: UserStats) => void) => {
+    return this.tableCache.onInsert(cb);
+  }
+
+  removeOnInsert = (cb: (ctx: EventContext, row: UserStats) => void) => {
+    return this.tableCache.removeOnInsert(cb);
+  }
+
+  onDelete = (cb: (ctx: EventContext, row: UserStats) => void) => {
+    return this.tableCache.onDelete(cb);
+  }
+
+  removeOnDelete = (cb: (ctx: EventContext, row: UserStats) => void) => {
+    return this.tableCache.removeOnDelete(cb);
+  }
+
+  // Updates are only defined for tables with primary keys.
+  onUpdate = (cb: (ctx: EventContext, oldRow: UserStats, newRow: UserStats) => void) => {
+    return this.tableCache.onUpdate(cb);
+  }
+
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: UserStats, newRow: UserStats) => void) => {
+    return this.tableCache.removeOnUpdate(cb);
+  }}

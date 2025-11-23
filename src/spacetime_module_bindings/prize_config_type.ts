@@ -4,19 +4,72 @@
 /* eslint-disable */
 /* tslint:disable */
 import {
-  TypeBuilder as __TypeBuilder,
-  t as __t,
-  type AlgebraicTypeType as __AlgebraicTypeType,
-  type Infer as __Infer,
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-export default __t.object("PrizeConfig", {
-  configId: __t.u8(),
-  jackpotAmount: __t.i64(),
-  firstPlaceAmount: __t.i64(),
-  secondPlaceAmount: __t.i64(),
-  currencyType: __t.string(),
-  updatedAt: __t.i64(),
-});
+export type PrizeConfig = {
+  configId: number,
+  jackpotAmount: bigint,
+  firstPlaceAmount: bigint,
+  secondPlaceAmount: bigint,
+  currencyType: string,
+  updatedAt: bigint,
+};
+let _cached_PrizeConfig_type_value: __AlgebraicTypeType | null = null;
+
+/**
+ * An object for generated helper functions.
+ */
+export const PrizeConfig = {
+  /**
+  * A function which returns this type represented as an AlgebraicType.
+  * This function is derived from the AlgebraicType used to generate this type.
+  */
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    if (_cached_PrizeConfig_type_value) return _cached_PrizeConfig_type_value;
+    _cached_PrizeConfig_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_PrizeConfig_type_value.value.elements.push(
+      { name: "configId", algebraicType: __AlgebraicTypeValue.U8 },
+      { name: "jackpotAmount", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "firstPlaceAmount", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "secondPlaceAmount", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "currencyType", algebraicType: __AlgebraicTypeValue.String },
+      { name: "updatedAt", algebraicType: __AlgebraicTypeValue.I64 },
+    );
+    return _cached_PrizeConfig_type_value;
+  },
+
+  serialize(writer: __BinaryWriter, value: PrizeConfig): void {
+    __AlgebraicTypeValue.serializeValue(writer, PrizeConfig.getTypeScriptAlgebraicType(), value);
+  },
+
+  deserialize(reader: __BinaryReader): PrizeConfig {
+    return __AlgebraicTypeValue.deserializeValue(reader, PrizeConfig.getTypeScriptAlgebraicType());
+  },
+
+}
+
+export default PrizeConfig;
 
 

@@ -212,13 +212,13 @@ pub fn create_round(
 
     ctx.db.rounds().insert(Rounds {
         round_id: 0, // auto_inc
-        round_number,
+        round_number: round_number,
         start_time: start,
         end_time: end,
-        duration_minutes,
+        duration_minutes: duration_minutes,
         prize,
         status: "open".to_string(),
-        block_number,
+        block_number: block_number,
         actual_tx_count: None,
         winning_fid: None,
         second_place_winner_fid: None,
@@ -347,11 +347,11 @@ pub fn save_prize_config(
     }
     let row = PrizeConfig {
         config_id: 1,
-        jackpot_amount,
-        first_place_amount,
-        second_place_amount,
-        currency_type,
-        updated_at,
+        jackpot_amount: jackpot_amount,
+        first_place_amount: first_place_amount,
+        second_place_amount: second_place_amount,
+        currency_type: currency_type,
+        updated_at: updated_at,
     };
     ctx.db.prize_config().insert(row);
 }
@@ -369,13 +369,13 @@ pub fn send_chat_message(
     let ts = now_secs(ctx);
     ctx.db.chat_messages().insert(ChatMessages {
         chat_id: 0, // auto_inc
-        round_id,
+        round_id: round_id,
         address,
         username,
         message,
-        pfp_url,
+        pfp_url: pfp_url,
         timestamp: ts,
-        msg_type,
+        msg_type: msg_type,
     });
 }
 
@@ -418,11 +418,11 @@ pub fn submit_guess(
 
     ctx.db.guesses().insert(Guesses {
         guess_id: 0, // auto_inc
-        round_id,
+        round_id: round_id,
         fid,
         username,
         guess,
-        pfp_url,
+        pfp_url: pfp_url,
         submitted_at: ts,
     });
 }
@@ -548,7 +548,7 @@ pub fn daily_checkin(
         username: username.clone(),
         pfp_url: pfp_url.clone(),
         checkin_date: now,
-        points_earned,
+        points_earned: points_earned,
         streak_count: new_streak,
     });
 

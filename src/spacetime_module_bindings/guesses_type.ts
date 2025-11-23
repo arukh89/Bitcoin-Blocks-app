@@ -4,20 +4,74 @@
 /* eslint-disable */
 /* tslint:disable */
 import {
-  TypeBuilder as __TypeBuilder,
-  t as __t,
-  type AlgebraicTypeType as __AlgebraicTypeType,
-  type Infer as __Infer,
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-export default __t.object("Guesses", {
-  guessId: __t.u64(),
-  roundId: __t.u64(),
-  fid: __t.i64(),
-  username: __t.string(),
-  guess: __t.i64(),
-  pfpUrl: __t.option(__t.string()),
-  submittedAt: __t.i64(),
-});
+export type Guesses = {
+  guessId: bigint,
+  roundId: bigint,
+  fid: bigint,
+  username: string,
+  guess: bigint,
+  pfpUrl: string | undefined,
+  submittedAt: bigint,
+};
+let _cached_Guesses_type_value: __AlgebraicTypeType | null = null;
+
+/**
+ * An object for generated helper functions.
+ */
+export const Guesses = {
+  /**
+  * A function which returns this type represented as an AlgebraicType.
+  * This function is derived from the AlgebraicType used to generate this type.
+  */
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    if (_cached_Guesses_type_value) return _cached_Guesses_type_value;
+    _cached_Guesses_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_Guesses_type_value.value.elements.push(
+      { name: "guessId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "roundId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "fid", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "username", algebraicType: __AlgebraicTypeValue.String },
+      { name: "guess", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "pfpUrl", algebraicType: __AlgebraicTypeValue.createOptionType(__AlgebraicTypeValue.String) },
+      { name: "submittedAt", algebraicType: __AlgebraicTypeValue.I64 },
+    );
+    return _cached_Guesses_type_value;
+  },
+
+  serialize(writer: __BinaryWriter, value: Guesses): void {
+    __AlgebraicTypeValue.serializeValue(writer, Guesses.getTypeScriptAlgebraicType(), value);
+  },
+
+  deserialize(reader: __BinaryReader): Guesses {
+    return __AlgebraicTypeValue.deserializeValue(reader, Guesses.getTypeScriptAlgebraicType());
+  },
+
+}
+
+export default Guesses;
 
 

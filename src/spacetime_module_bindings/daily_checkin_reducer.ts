@@ -4,14 +4,65 @@
 /* eslint-disable */
 /* tslint:disable */
 import {
-  TypeBuilder as __TypeBuilder,
-  t as __t,
-  type AlgebraicTypeType as __AlgebraicTypeType,
-  type Infer as __Infer,
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-export default {
-  userIdentifier: __t.string(),
-  username: __t.string(),
-  pfpUrl: __t.string(),
+export type DailyCheckin = {
+  userIdentifier: string,
+  username: string,
+  pfpUrl: string,
 };
+let _cached_DailyCheckin_type_value: __AlgebraicTypeType | null = null;
+
+/**
+ * An object for generated helper functions.
+ */
+export const DailyCheckin = {
+  /**
+  * A function which returns this type represented as an AlgebraicType.
+  * This function is derived from the AlgebraicType used to generate this type.
+  */
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    if (_cached_DailyCheckin_type_value) return _cached_DailyCheckin_type_value;
+    _cached_DailyCheckin_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_DailyCheckin_type_value.value.elements.push(
+      { name: "userIdentifier", algebraicType: __AlgebraicTypeValue.String },
+      { name: "username", algebraicType: __AlgebraicTypeValue.String },
+      { name: "pfpUrl", algebraicType: __AlgebraicTypeValue.String },
+    );
+    return _cached_DailyCheckin_type_value;
+  },
+
+  serialize(writer: __BinaryWriter, value: DailyCheckin): void {
+    __AlgebraicTypeValue.serializeValue(writer, DailyCheckin.getTypeScriptAlgebraicType(), value);
+  },
+
+  deserialize(reader: __BinaryReader): DailyCheckin {
+    return __AlgebraicTypeValue.deserializeValue(reader, DailyCheckin.getTypeScriptAlgebraicType());
+  },
+
+}
+
+export default DailyCheckin;
+

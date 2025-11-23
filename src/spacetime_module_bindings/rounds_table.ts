@@ -4,24 +4,103 @@
 /* eslint-disable */
 /* tslint:disable */
 import {
-  TypeBuilder as __TypeBuilder,
-  t as __t,
-  type AlgebraicTypeType as __AlgebraicTypeType,
-  type Infer as __Infer,
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
+import { Rounds } from "./rounds_type";
+import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
+declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
-export default __t.row({
-  roundId: __t.u64().primaryKey(),
-  roundNumber: __t.i64(),
-  startTime: __t.i64(),
-  endTime: __t.i64(),
-  durationMinutes: __t.i64(),
-  prize: __t.string(),
-  status: __t.string(),
-  blockNumber: __t.option(__t.i64()),
-  actualTxCount: __t.option(__t.i64()),
-  winningFid: __t.option(__t.i64()),
-  secondPlaceWinnerFid: __t.option(__t.i64()),
-  blockHash: __t.option(__t.string()),
-  createdAt: __t.i64(),
-});
+/**
+ * Table handle for the table `rounds`.
+ *
+ * Obtain a handle from the [`rounds`] property on [`RemoteTables`],
+ * like `ctx.db.rounds`.
+ *
+ * Users are encouraged not to explicitly reference this type,
+ * but to directly chain method calls,
+ * like `ctx.db.rounds.on_insert(...)`.
+ */
+export class RoundsTableHandle<TableName extends string> implements __TableHandle<TableName> {
+  // phantom type to track the table name
+  readonly tableName!: TableName;
+  tableCache: __TableCache<Rounds>;
+
+  constructor(tableCache: __TableCache<Rounds>) {
+    this.tableCache = tableCache;
+  }
+
+  count(): number {
+    return this.tableCache.count();
+  }
+
+  iter(): Iterable<Rounds> {
+    return this.tableCache.iter();
+  }
+  /**
+   * Access to the `roundId` unique index on the table `rounds`,
+   * which allows point queries on the field of the same name
+   * via the [`RoundsRoundIdUnique.find`] method.
+   *
+   * Users are encouraged not to explicitly reference this type,
+   * but to directly chain method calls,
+   * like `ctx.db.rounds.roundId().find(...)`.
+   *
+   * Get a handle on the `roundId` unique index on the table `rounds`.
+   */
+  roundId = {
+    // Find the subscribed row whose `roundId` column value is equal to `col_val`,
+    // if such a row is present in the client cache.
+    find: (col_val: bigint): Rounds | undefined => {
+      for (let row of this.tableCache.iter()) {
+        if (__deepEqual(row.roundId, col_val)) {
+          return row;
+        }
+      }
+    },
+  };
+
+  onInsert = (cb: (ctx: EventContext, row: Rounds) => void) => {
+    return this.tableCache.onInsert(cb);
+  }
+
+  removeOnInsert = (cb: (ctx: EventContext, row: Rounds) => void) => {
+    return this.tableCache.removeOnInsert(cb);
+  }
+
+  onDelete = (cb: (ctx: EventContext, row: Rounds) => void) => {
+    return this.tableCache.onDelete(cb);
+  }
+
+  removeOnDelete = (cb: (ctx: EventContext, row: Rounds) => void) => {
+    return this.tableCache.removeOnDelete(cb);
+  }
+
+  // Updates are only defined for tables with primary keys.
+  onUpdate = (cb: (ctx: EventContext, oldRow: Rounds, newRow: Rounds) => void) => {
+    return this.tableCache.onUpdate(cb);
+  }
+
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: Rounds, newRow: Rounds) => void) => {
+    return this.tableCache.removeOnUpdate(cb);
+  }}

@@ -4,21 +4,76 @@
 /* eslint-disable */
 /* tslint:disable */
 import {
-  TypeBuilder as __TypeBuilder,
-  t as __t,
-  type AlgebraicTypeType as __AlgebraicTypeType,
-  type Infer as __Infer,
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+  type TableHandle as __TableHandle,
 } from "spacetimedb";
 
-export default __t.object("ChatMessages", {
-  chatId: __t.u64(),
-  roundId: __t.string(),
-  address: __t.string(),
-  username: __t.string(),
-  message: __t.string(),
-  pfpUrl: __t.string(),
-  timestamp: __t.i64(),
-  msgType: __t.string(),
-});
+export type ChatMessages = {
+  chatId: bigint,
+  roundId: string,
+  address: string,
+  username: string,
+  message: string,
+  pfpUrl: string,
+  timestamp: bigint,
+  msgType: string,
+};
+let _cached_ChatMessages_type_value: __AlgebraicTypeType | null = null;
+
+/**
+ * An object for generated helper functions.
+ */
+export const ChatMessages = {
+  /**
+  * A function which returns this type represented as an AlgebraicType.
+  * This function is derived from the AlgebraicType used to generate this type.
+  */
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    if (_cached_ChatMessages_type_value) return _cached_ChatMessages_type_value;
+    _cached_ChatMessages_type_value = __AlgebraicTypeValue.Product({ elements: [] });
+    _cached_ChatMessages_type_value.value.elements.push(
+      { name: "chatId", algebraicType: __AlgebraicTypeValue.U64 },
+      { name: "roundId", algebraicType: __AlgebraicTypeValue.String },
+      { name: "address", algebraicType: __AlgebraicTypeValue.String },
+      { name: "username", algebraicType: __AlgebraicTypeValue.String },
+      { name: "message", algebraicType: __AlgebraicTypeValue.String },
+      { name: "pfpUrl", algebraicType: __AlgebraicTypeValue.String },
+      { name: "timestamp", algebraicType: __AlgebraicTypeValue.I64 },
+      { name: "msgType", algebraicType: __AlgebraicTypeValue.String },
+    );
+    return _cached_ChatMessages_type_value;
+  },
+
+  serialize(writer: __BinaryWriter, value: ChatMessages): void {
+    __AlgebraicTypeValue.serializeValue(writer, ChatMessages.getTypeScriptAlgebraicType(), value);
+  },
+
+  deserialize(reader: __BinaryReader): ChatMessages {
+    return __AlgebraicTypeValue.deserializeValue(reader, ChatMessages.getTypeScriptAlgebraicType());
+  },
+
+}
+
+export default ChatMessages;
 
 
