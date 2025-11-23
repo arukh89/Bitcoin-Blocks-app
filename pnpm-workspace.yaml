@@ -1,0 +1,8 @@
+packages:
+  - ./
+
+onlyBuiltDependencies:
+  - bufferutil
+  - utf-8-validate
+  - keccak
+  - unrs-resolver

@@ -7,10 +7,6 @@ interface BlockInfo {
   tx_count: number
 }
 
-interface TransactionList {
-  length: number
-}
-
 /**
  * Fetch Bitcoin block data from mempool.space
  * 
