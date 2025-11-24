@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Card, CardContent } from '@/components/ui/card'
@@ -17,6 +18,7 @@ export function SignInButton() {
   const [neynarUrl, setNeynarUrl] = useState<string>('')
   const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
   const didAutoWalletRef = useRef(false)
+  const { toast } = useToast()
   
   // Wagmi hooks for wallet connection
   const { address, isConnected } = useAccount()
@@ -38,8 +40,17 @@ export function SignInButton() {
 
   const handleNeynarSignIn = async (): Promise<void> => {
     try {
+      const clientId = process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID
+      if (!clientId) {
+        toast({
+          title: 'Missing Neynar Client ID',
+          description: 'Set NEXT_PUBLIC_NEYNAR_CLIENT_ID in your environment to enable Farcaster login.',
+          variant: 'destructive'
+        })
+        return
+      }
       // Generate Neynar auth URL
-      const authUrl = `https://app.neynar.com/login?client_id=${process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin)}`
+      const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin)}`
       setNeynarUrl(authUrl)
       
       // Open in new window for OAuth flow
@@ -162,9 +173,10 @@ export function SignInButton() {
                     ) : (
                       <Button
                         onClick={handleNeynarSignIn}
-                        className="w-full bg-purple-600 hover:bg-purple-700"
+                        disabled={!process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID}
+                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Generate QR Code
+                        {process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID ? 'Generate QR Code' : 'Configure Neynar Client ID'}
                       </Button>
                     )}
 

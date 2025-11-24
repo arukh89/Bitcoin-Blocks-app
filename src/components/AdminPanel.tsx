@@ -240,24 +240,45 @@ export function AdminPanel() {
       setLoading(true)
       
       // Fetch from internal mempool API
-      // 1) Try recent blocks then locate by height
-      const recentRes = await fetch('/api/mempool?action=recent-blocks')
-      if (!recentRes.ok) {
-        throw new Error('Failed to fetch recent blocks')
-      }
-      const recentBlocks = await recentRes.json() as Array<{ height: number, hash: string }>
-      const found = recentBlocks.find(b => b.height === closedRound.blockNumber)
-      if (!found) {
-        throw new Error(`Block #${closedRound.blockNumber} not found in recent blocks. Try again later.`)
-      }
-      const blockHash = found.hash
+      // Strategy: try recent blocks first; if not found, fall back to block-by-height
+      let blockHash = ''
+      let actualTxCount = 0
 
-      const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
-      if (!txRes.ok) {
-        throw new Error('Failed to fetch transaction count')
+      // 1) Try recent blocks list
+      try {
+        const recentRes = await fetch('/api/mempool?action=recent-blocks')
+        if (recentRes.ok) {
+          const recentBlocks = await recentRes.json() as Array<{ height: number, hash: string }>
+          const found = recentBlocks.find(b => b.height === closedRound.blockNumber)
+          if (found) {
+            blockHash = found.hash
+            const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
+            if (!txRes.ok) throw new Error('Failed to fetch transaction count')
+            const { txCount } = await (txRes.json() as Promise<{ txCount: number }>)
+            actualTxCount = txCount
+          }
+        }
+      } catch (e) {
+        // Non-fatal; we'll fall back below
       }
-      const { txCount } = await txRes.json() as { txCount: number }
-      const actualTxCount = txCount
+
+      // 2) Fallback: resolve by explicit block height
+      if (!blockHash) {
+        const byHeight = await fetch(`/api/mempool?action=block-by-height&height=${closedRound.blockNumber}`)
+        if (!byHeight.ok) {
+          throw new Error(`Block #${closedRound.blockNumber} not found yet. Try again later.`)
+        }
+        const data = await byHeight.json() as { blockHash: string, txCount?: number }
+        blockHash = data.blockHash
+        if (typeof data.txCount === 'number') {
+          actualTxCount = data.txCount
+        } else {
+          const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
+          if (!txRes.ok) throw new Error('Failed to fetch transaction count')
+          const { txCount } = await (txRes.json() as Promise<{ txCount: number }>)
+          actualTxCount = txCount
+        }
+      }
 
       // Find winners
       const guesses = getGuessesForRound(closedRound.id)
@@ -412,12 +433,20 @@ export function AdminPanel() {
     
     const checkBlock = async (): Promise<boolean> => {
       try {
+        // Fast path: check recent blocks list
         const response = await fetch('/api/mempool?action=recent-blocks')
-        if (!response.ok) return false
-        const blocks = await response.json() as Array<{ height: number }>
-        const exists = blocks.some(b => b.height === targetBlock)
-        if (exists) {
-          console.log(`✅ Block #${targetBlock} is now available (recent-blocks)!`)
+        if (response.ok) {
+          const blocks = await response.json() as Array<{ height: number }>
+          const exists = blocks.some(b => b.height === targetBlock)
+          if (exists) {
+            console.log(`✅ Block #${targetBlock} is now available (recent-blocks)!`)
+            return true
+          }
+        }
+        // Fallback: resolve by height explicitly
+        const byHeight = await fetch(`/api/mempool?action=block-by-height&height=${targetBlock}`)
+        if (byHeight.ok) {
+          console.log(`✅ Block #${targetBlock} is now available (block-by-height)!`)
           return true
         }
         return false

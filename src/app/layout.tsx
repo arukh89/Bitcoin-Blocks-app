@@ -28,13 +28,9 @@ export default function RootLayout({
 }
 
 export async function generateMetadata() {
-  const APP_URL = process.env.NEXT_PUBLIC_APP_URL
-  const FRAME_IMAGE_URL = process.env.NEXT_PUBLIC_FRAME_IMAGE_URL
-  const SPLASH_IMAGE_URL = process.env.NEXT_PUBLIC_SPLASH_IMAGE_URL
-
-  if (!APP_URL) throw new Error('Missing env: NEXT_PUBLIC_APP_URL')
-  if (!FRAME_IMAGE_URL) throw new Error('Missing env: NEXT_PUBLIC_FRAME_IMAGE_URL')
-  if (!SPLASH_IMAGE_URL) throw new Error('Missing env: NEXT_PUBLIC_SPLASH_IMAGE_URL')
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
+  const FRAME_IMAGE_URL = process.env.NEXT_PUBLIC_FRAME_IMAGE_URL || (APP_URL ? `${APP_URL.replace(/\/$/, '')}/frame.png` : '/frame.png')
+  const SPLASH_IMAGE_URL = process.env.NEXT_PUBLIC_SPLASH_IMAGE_URL || (APP_URL ? `${APP_URL.replace(/\/$/, '')}/splash.png` : '/splash.png')
 
   return {
     title: 'Bitcoin Blocks',
@@ -49,7 +45,7 @@ export async function generateMetadata() {
           action: {
             type: 'launch_frame',
             name: 'Bitcoin Blocks',
-            url: APP_URL,
+            url: APP_URL || '/',
             splashImageUrl: SPLASH_IMAGE_URL,
             splashBackgroundColor: '#ffffff',
           },
