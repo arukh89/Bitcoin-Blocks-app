@@ -28,9 +28,9 @@ export default function RootLayout({
 }
 
 export async function generateMetadata() {
-  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
-  const FRAME_IMAGE_URL = process.env.NEXT_PUBLIC_FRAME_IMAGE_URL || (APP_URL ? `${APP_URL.replace(/\/$/, '')}/frame.png` : '/frame.png')
-  const SPLASH_IMAGE_URL = process.env.NEXT_PUBLIC_SPLASH_IMAGE_URL || (APP_URL ? `${APP_URL.replace(/\/$/, '')}/splash.png` : '/splash.png')
+  const APP_URL = 'https://bitcoin-blocks-app.vercel.app'
+  const FRAME_IMAGE_URL = 'https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/thumbnail_9f60f0c6-c9ab-41f5-a2d9-6234f1e9deea-58nnKDHo0Kl3GHSEKKjUNW1xfgwbxR'
+  const SPLASH_IMAGE_URL = 'https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/farcaster/splash_images/splash_image1.svg'
 
   return {
     title: 'Bitcoin Blocks',
@@ -38,14 +38,14 @@ export async function generateMetadata() {
       "Predict Bitcoin transactions & compete! Login, guess, and win by forecasting the next block's transaction count. Real-time updates and leaderboard powered by SpacetimeDB.",
     other: {
       'fc:frame': JSON.stringify({
-        version: 'next',
+        version: 'vNext',
         imageUrl: FRAME_IMAGE_URL,
         button: {
           title: 'Launch Bitcoin Blocks',
           action: {
             type: 'launch_frame',
             name: 'Bitcoin Blocks',
-            url: APP_URL || '/',
+            url: APP_URL,
             splashImageUrl: SPLASH_IMAGE_URL,
             splashBackgroundColor: '#ffffff',
           },
