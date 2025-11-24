@@ -19,8 +19,8 @@
     "ogImageUrl": "https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/thumbnail_9f60f0c6-c9ab-41f5-a2d9-6234f1e9deea-58nnKDHo0Kl3GHSEKKjUNW1xfgwbxR"
   },
   "accountAssociation": {
-    "header": "eyJmaWQiOjI1MDcwNCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDE1MzY1NzE0NWVBMmQ1Nzk2OTFhMTQ2YzdFYTRDRkFFMzdEMjdGYWUifQ",
-    "payload": "eyJkb21haW4iOiJnYXMtYXNpZGUtMzk1LmFwcC5vaGFyYS5haSJ9",
-    "signature": "iE5m5wMlNCll64r9FX2tb4KfeVGmIUedE1+2OTW+Efdh6LOx4jvRGdeMIVBiFcpbRpGVI3xzcfaIn45rXXvK1hw="
+    "header": "",
+    "payload": "",
+    "signature": ""
   }
 }
