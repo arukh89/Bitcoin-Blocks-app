@@ -7,7 +7,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'pbs.twimg.com' },
       { protocol: 'https', hostname: 'blob.vercel-storage.com' },
       { protocol: 'https', hostname: 'public.blob.vercel-storage.com' },
-    ]
+      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' },
+    ],
   },
   webpack: (config) => {
     config.resolve = config.resolve || {}
@@ -22,22 +23,28 @@ const nextConfig = {
     const envHost = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
     const stripped = envHost.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '')
     const wssHost = stripped ? `wss://${stripped}` : ''
+
+    const connectSrc = [
+      "'self'",
+      'https://api.farcaster.xyz',
+      'https://api.neynar.com',
+      'https://mempool.space',
+      'https://*.mempool.space',
+      wssHost,
+    ]
+      .filter(Boolean)
+      .join(' ')
+
     const csp = [
       "default-src 'self'",
       "img-src 'self' data: https:",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      [
-        "connect-src 'self'",
-        'https://api.farcaster.xyz',
-        'https://api.neynar.com',
-        'https://mempool.space',
-        'https://*.mempool.space',
-        wssHost
-      ].filter(Boolean).join(' '),
-      "frame-ancestors 'self' https://warpcast.com https://*.warpcast.com"
+      `connect-src ${connectSrc}`,
+      "frame-ancestors 'self' https://warpcast.com https://*.warpcast.com",
     ].join('; ')
+
     return [
       {
         source: '/:path*',
