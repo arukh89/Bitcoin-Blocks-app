@@ -808,47 +808,47 @@ export function AdminPanel() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="text-gray-300 text-sm">Homepage Title</Label>
-                <Input defaultValue={getSetting('homepage_title', 'Bitcoin Blocks')} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('homepage_title', e.target.value.trim(), user?.address || ''); toast({ title: 'Saved', description: 'homepage_title updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="homepage_title" className="text-gray-300 text-sm">Homepage Title</Label>
+                <Input id="homepage_title" name="homepage_title" defaultValue={getSetting('homepage_title', 'Bitcoin Blocks')} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('homepage_title', e.target.value.trim(), user?.address || ''); toast({ title: 'Saved', description: 'homepage_title updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Homepage Tagline</Label>
-                <Input defaultValue={getSetting('homepage_tagline', 'Predicting Bitcoin’s Next Block')} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('homepage_tagline', e.target.value.trim(), user?.address || ''); toast({ title: 'Saved', description: 'homepage_tagline updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="homepage_tagline" className="text-gray-300 text-sm">Homepage Tagline</Label>
+                <Input id="homepage_tagline" name="homepage_tagline" defaultValue={getSetting('homepage_tagline', 'Predicting Bitcoin’s Next Block')} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('homepage_tagline', e.target.value.trim(), user?.address || ''); toast({ title: 'Saved', description: 'homepage_tagline updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Start Template</Label>
-                <Input defaultValue={getSetting('announce_template_round_start', '🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m')} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('announce_template_round_start', e.target.value.trim(), user?.address || ''); toast({ title: 'Saved', description: 'announce_template_round_start updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="announce_template_round_start" className="text-gray-300 text-sm">Start Template</Label>
+                <Input id="announce_template_round_start" name="announce_template_round_start" defaultValue={getSetting('announce_template_round_start', '🔔 Round #{round} Started! 💰 {jackpot} • 🧱 #{block} • ⏱ {duration}m')} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('announce_template_round_start', e.target.value.trim(), user?.address || ''); toast({ title: 'Saved', description: 'announce_template_round_start updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Results Template</Label>
-                <Input defaultValue={getSetting('announce_template_results', '📊 Block #{block} had {txCount} txs. 🥇 @{winner}')} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('announce_template_results', e.target.value.trim(), user?.address || ''); toast({ title: 'Saved', description: 'announce_template_results updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="announce_template_results" className="text-gray-300 text-sm">Results Template</Label>
+                <Input id="announce_template_results" name="announce_template_results" defaultValue={getSetting('announce_template_results', '📊 Block #{block} had {txCount} txs. 🥇 @{winner}')} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('announce_template_results', e.target.value.trim(), user?.address || ''); toast({ title: 'Saved', description: 'announce_template_results updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Admin Poll Interval (s)</Label>
-                <Input type="number" defaultValue={String(getInt('admin_poll_interval_seconds', 30))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('admin_poll_interval_seconds', String(Math.max(5, parseInt(e.target.value || '30', 10))), user?.address || ''); toast({ title: 'Saved', description: 'admin_poll_interval_seconds updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="admin_poll_interval_seconds" className="text-gray-300 text-sm">Admin Poll Interval (s)</Label>
+                <Input id="admin_poll_interval_seconds" name="admin_poll_interval_seconds" type="number" defaultValue={String(getInt('admin_poll_interval_seconds', 30))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('admin_poll_interval_seconds', String(Math.max(5, parseInt(e.target.value || '30', 10))), user?.address || ''); toast({ title: 'Saved', description: 'admin_poll_interval_seconds updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Guess Min</Label>
-                <Input type="number" defaultValue={String(getInt('guess_min', 1))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('guess_min', String(parseInt(e.target.value || '1', 10)), user?.address || ''); toast({ title: 'Saved', description: 'guess_min updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="guess_min" className="text-gray-300 text-sm">Guess Min</Label>
+                <Input id="guess_min" name="guess_min" type="number" defaultValue={String(getInt('guess_min', 1))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('guess_min', String(parseInt(e.target.value || '1', 10)), user?.address || ''); toast({ title: 'Saved', description: 'guess_min updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Guess Max</Label>
-                <Input type="number" defaultValue={String(getInt('guess_max', 20000))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('guess_max', String(parseInt(e.target.value || '20000', 10)), user?.address || ''); toast({ title: 'Saved', description: 'guess_max updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="guess_max" className="text-gray-300 text-sm">Guess Max</Label>
+                <Input id="guess_max" name="guess_max" type="number" defaultValue={String(getInt('guess_max', 20000))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('guess_max', String(parseInt(e.target.value || '20000', 10)), user?.address || ''); toast({ title: 'Saved', description: 'guess_max updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Require FID for Guess</Label>
+                <Label htmlFor="require_fid_for_guess" className="text-gray-300 text-sm">Require FID for Guess</Label>
                 <div className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked={getBool('require_fid_for_guess', true)} onChange={async (e) => { await ((client as any).reducers as any).saveSetting('require_fid_for_guess', e.target.checked ? 'true' : 'false', user?.address || ''); toast({ title: 'Saved', description: 'require_fid_for_guess updated' }) }} />
+                  <input id="require_fid_for_guess" name="require_fid_for_guess" type="checkbox" defaultChecked={getBool('require_fid_for_guess', true)} onChange={async (e) => { await ((client as any).reducers as any).saveSetting('require_fid_for_guess', e.target.checked ? 'true' : 'false', user?.address || ''); toast({ title: 'Saved', description: 'require_fid_for_guess updated' }) }} />
                   <span className="text-xs text-gray-400">Farcaster-only guessing</span>
                 </div>
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Check-in Base Points</Label>
-                <Input type="number" defaultValue={String(getInt('checkin_base_points', 10))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('checkin_base_points', String(parseInt(e.target.value || '10', 10)), user?.address || ''); toast({ title: 'Saved', description: 'checkin_base_points updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="checkin_base_points" className="text-gray-300 text-sm">Check-in Base Points</Label>
+                <Input id="checkin_base_points" name="checkin_base_points" type="number" defaultValue={String(getInt('checkin_base_points', 10))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('checkin_base_points', String(parseInt(e.target.value || '10', 10)), user?.address || ''); toast({ title: 'Saved', description: 'checkin_base_points updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
               <div>
-                <Label className="text-gray-300 text-sm">Check-in Streak Bonus / Day</Label>
-                <Input type="number" defaultValue={String(getInt('checkin_streak_bonus_per_day', 2))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('checkin_streak_bonus_per_day', String(parseInt(e.target.value || '2', 10)), user?.address || ''); toast({ title: 'Saved', description: 'checkin_streak_bonus_per_day updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
+                <Label htmlFor="checkin_streak_bonus_per_day" className="text-gray-300 text-sm">Check-in Streak Bonus / Day</Label>
+                <Input id="checkin_streak_bonus_per_day" name="checkin_streak_bonus_per_day" type="number" defaultValue={String(getInt('checkin_streak_bonus_per_day', 2))} onBlur={async (e) => { await ((client as any).reducers as any).saveSetting('checkin_streak_bonus_per_day', String(parseInt(e.target.value || '2', 10)), user?.address || ''); toast({ title: 'Saved', description: 'checkin_streak_bonus_per_day updated' }) }} className="bg-gray-800/50 border-gray-600/50 text-white" />
               </div>
             </div>
           </div>

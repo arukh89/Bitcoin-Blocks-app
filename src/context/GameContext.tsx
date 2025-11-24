@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { Round, Guess, Log, ChatMessage, PrizeConfiguration } from '@/types/game'
 import type { UserStats, CheckInRecord, WeeklyLeaderboardEntry, CheckInResult } from '@/types/checkin'
 import { useAuth, ADMIN_FIDS, isAdminFid, isAdminWallet, ADMIN_WALLETS } from '@/context/AuthContext'
@@ -190,7 +190,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // ===========================================
   // DATABASE CONNECTION (REALTIME ONLY)
   // ===========================================
+  const didInitRef = useRef(false)
+  const didSubscribeRef = useRef(false)
+
   useEffect(() => {
+    if (didInitRef.current) return
+    didInitRef.current = true
     let mounted = true
 
     async function initConnection(): Promise<void> {
@@ -209,26 +214,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
             setConnected(false)
             setClient(null)
             setInitSnapshotDone(false)
+            didSubscribeRef.current = false
             // Try to reconnect with backoff
             setTimeout(() => { if (mounted) initConnection().catch(console.error) }, 2000)
           }
         })
 
         if (!mounted) return
-
-        // Explicitly subscribe to all tables to ensure reliable updates
-        try {
-          // Newer SDKs expose subscribeToAllTables
-          ;(conn.subscriptionBuilder() as any).subscribeToAllTables?.()
-        } catch (e) {
-          console.warn('subscribeAllTables not available or failed', e)
-        }
-
         setClient(conn)
-        console.log('✅ SpacetimeDB Client connected')
-        setConnected(true)
-        console.log('✅ REALTIME Connection established!')
-        console.log('🟢 Database connection ready')
+        console.log('✅ SpacetimeDB Client ready (waiting for onConnect to OPEN)')
       } catch (error) {
         console.error('❌ Failed to connect to SpacetimeDB:', error)
         setConnected(false)
@@ -237,10 +231,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     initConnection().catch(console.error)
 
-    return () => {
-      mounted = false
-    }
+    return () => { mounted = false }
   }, [])
+
+  // Subscribe to all tables AFTER socket OPEN
+  useEffect(() => {
+    if (!client || !connected || didSubscribeRef.current) return
+    try {
+      ;(client as any).subscriptionBuilder?.().subscribeToAllTables?.()
+      didSubscribeRef.current = true
+      console.log('📡 Subscribed to all tables')
+    } catch (e) {
+      console.warn('subscribeToAllTables not available or failed', e)
+    }
+  }, [client, connected])
 
   // ===========================================
   // Subscribe to settings table (key/value)

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
 import { useAuth } from '@/context/AuthContext'
@@ -101,15 +102,19 @@ export function GlobalChat() {
               } finally {
                 setSending(false)
               }
-            }} className="flex gap-2">
+            }} className="flex gap-2 items-center">
+              <Label htmlFor="globalChatMessage" className="sr-only">Chat message</Label>
               <Input
                 type="text"
+                id="globalChatMessage"
+                name="globalChatMessage"
                 placeholder="Type a message..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 disabled={!connected || sending}
                 maxLength={200}
                 className="h-10 text-sm bg-gray-800/50 border-cyan-500/50 text-white placeholder:text-gray-500"
+                aria-label="Chat message"
               />
               <Button 
                 type="submit" 
