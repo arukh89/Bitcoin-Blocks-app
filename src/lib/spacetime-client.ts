@@ -17,8 +17,25 @@ if (!SPACETIME_DB_NAME) {
   throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_DB_NAME')
 }
 
+function normalizeWsHost(input: string): string {
+  let h = input.trim()
+  if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
+  if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
+  // Upgrade ws->wss in non-local environments
+  const isLocal = /^(ws:\/\/|wss:\/\/)?(localhost|127\.0\.0\.1)/i.test(h)
+  if (h.startsWith('ws://') && !isLocal) h = 'wss://' + h.slice('ws://'.length)
+  if (!h.startsWith('ws://') && !h.startsWith('wss://')) {
+    // Assume host without scheme; default to wss
+    h = 'wss://' + h.replace(/^\/+/, '')
+  }
+  if (!isLocal && !h.startsWith('wss://')) {
+    throw new Error('NEXT_PUBLIC_SPACETIME_HOST must use wss:// in production')
+  }
+  return h
+}
+
 // Narrow to string after runtime guards
-const HOST = SPACETIME_HOST as string
+const HOST = normalizeWsHost(SPACETIME_HOST as string)
 const DB_NAME = SPACETIME_DB_NAME as string
 
 let dbConnection: DbConnType | null = null
