@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
 import { useAuth } from '@/context/AuthContext'
-import sdk from "@farcaster/miniapp-sdk"
+import { sdk } from "@farcaster/miniapp-sdk"
 import { useAddMiniApp } from "@/hooks/useAddMiniApp";
 import { useQuickAuth } from "@/hooks/useQuickAuth";
 import { useIsInFarcaster } from "@/hooks/useIsInFarcaster";
@@ -49,36 +49,8 @@ export default function Home() {
       tryAddMiniApp()
     }, [addMiniApp])
   
-  useEffect(() => {
-    const initializeFarcaster = async () => {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 100))
-        if (document.readyState !== 'complete') {
-          await new Promise(resolve => {
-            if (document.readyState === 'complete') {
-              resolve(void 0)
-            } else {
-              window.addEventListener('load', () => resolve(void 0), { once: true })
-            }
-          })
-        }
-
-        await sdk.actions.ready()
-        console.log("Farcaster SDK initialized successfully - app fully loaded")
-      } catch (error) {
-        console.error('Failed to initialize Farcaster SDK:', error)
-        setTimeout(async () => {
-          try {
-            await sdk.actions.ready()
-            console.log('Farcaster SDK initialized on retry')
-          } catch (retryError) {
-            console.error('Farcaster SDK retry failed:', retryError)
-          }
-        }, 1000)
-      }
-    }
-    initializeFarcaster()
-  }, [])
+  // `sdk.actions.ready()` is called at root via FarcasterReady to dismiss splash.
+  // No need to call here again.
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -4,6 +4,7 @@ import './globals.css'
 import NextDynamic from 'next/dynamic'
 const Providers = NextDynamic(() => import('./providers').then(m => m.Providers), { ssr: false })
 import { Toaster } from '@/components/ui/sonner'
+import FarcasterReady from '@/components/FarcasterReady'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -18,6 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased font-sans`}>
+        <FarcasterReady />
         <Providers>
           {children}
           <Toaster richColors position="top-center" />

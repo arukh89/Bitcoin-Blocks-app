@@ -1,15 +1,21 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import sdk from '@farcaster/miniapp-sdk'
+import { sdk } from '@farcaster/miniapp-sdk'
 import type { User } from '@/types/game'
 
 // Admin lists from env (no hardcoded values)
-const FIDS_RAW = process.env.NEXT_PUBLIC_ADMIN_FIDS
-const WALLETS_RAW = process.env.NEXT_PUBLIC_ADMIN_WALLETS
-
-if (!FIDS_RAW) throw new Error('Missing env: NEXT_PUBLIC_ADMIN_FIDS')
-if (!WALLETS_RAW) throw new Error('Missing env: NEXT_PUBLIC_ADMIN_WALLETS')
+const FIDS_RAW = process.env.NEXT_PUBLIC_ADMIN_FIDS || ''
+const WALLETS_RAW = process.env.NEXT_PUBLIC_ADMIN_WALLETS || ''
+if (!process.env.NEXT_PUBLIC_ADMIN_FIDS) {
+  // Avoid crashing client on missing env; log once
+  // eslint-disable-next-line no-console
+  console.warn('NEXT_PUBLIC_ADMIN_FIDS not set; admin FIDs default to empty list')
+}
+if (!process.env.NEXT_PUBLIC_ADMIN_WALLETS) {
+  // eslint-disable-next-line no-console
+  console.warn('NEXT_PUBLIC_ADMIN_WALLETS not set; admin wallets default to empty list')
+}
 
 export const ADMIN_FIDS: number[] = FIDS_RAW.split(',')
   .map(s => s.trim())
