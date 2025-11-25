@@ -42,7 +42,7 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       `connect-src ${connectSrc}`,
-      "frame-ancestors 'self' https://warpcast.com https://*.warpcast.com",
+      "frame-ancestors 'self' https://warpcast.com https://*.warpcast.com https://farcaster.xyz https://*.farcaster.xyz",
     ].join('; ')
 
     return [
