@@ -37,8 +37,24 @@ export async function generateMetadata() {
     description:
       "Predict Bitcoin transactions & compete! Login, guess, and win by forecasting the next block's transaction count. Real-time updates and leaderboard powered by SpacetimeDB.",
     other: {
+      // Mini App Embed (current)
+      'fc:miniapp': JSON.stringify({
+        version: '1',
+        imageUrl: FRAME_IMAGE_URL,
+        button: {
+          title: 'Launch Bitcoin Blocks',
+          action: {
+            type: 'launch_frame',
+            name: 'Bitcoin Blocks',
+            url: APP_URL,
+            splashImageUrl: SPLASH_IMAGE_URL,
+            splashBackgroundColor: '#ffffff',
+          },
+        },
+      }),
+      // Backward compatibility for older clients still reading fc:frame
       'fc:frame': JSON.stringify({
-        version: 'vNext',
+        version: '1',
         imageUrl: FRAME_IMAGE_URL,
         button: {
           title: 'Launch Bitcoin Blocks',
