@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useGame } from '@/context/GameContext'
-import { SignInButton } from '@/components/SignInButton'
 
 export function AllPredictions() {
   const { activeRound, getGuessesForRound } = useGame()
@@ -28,7 +27,7 @@ export function AllPredictions() {
               </motion.span>
               All Predictions ({guesses.length})
             </div>
-            <SignInButton />
+            {/* Removed SignInButton from All Predictions header */}
           </div>
           <div className="flex items-center gap-2 text-xs font-normal">
             <Badge variant="outline" className="bg-green-500/20 text-green-300 border-green-400/50">

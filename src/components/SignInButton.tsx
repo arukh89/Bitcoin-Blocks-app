@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -88,12 +89,15 @@ export function SignInButton() {
   // If in Farcaster context and already authenticated
   if (isInFarcaster && authMode === 'farcaster-sdk') {
     return (
-      <Button
-        onClick={handleSignOut}
-        variant="outline"
-        className="glass-card text-white border-purple-500/50 hover:bg-purple-500/20"
-      >
-        👤 {user?.username} • Sign Out
+      <Button onClick={handleSignOut} variant="outline" className="glass-card text-white border-purple-500/50 hover:bg-purple-500/20">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={user?.pfpUrl} alt={user?.username || 'user'} />
+            <AvatarFallback>{user?.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+          </Avatar>
+          <span>{user?.username}</span>
+          <span className="opacity-60">• Sign Out</span>
+        </div>
       </Button>
     )
   }
@@ -101,14 +105,13 @@ export function SignInButton() {
   // If authenticated via other methods
   if (user) {
     return (
-      <Button
-        onClick={() => setShowDialog(true)}
-        variant="outline"
-        className="glass-card text-white border-green-500/50 hover:bg-green-500/20"
-      >
+      <Button onClick={() => setShowDialog(true)} variant="outline" className="glass-card text-white border-green-500/50 hover:bg-green-500/20">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          {user.username}
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={user.pfpUrl} alt={user.username} />
+            <AvatarFallback>{user.username[0]?.toUpperCase() || 'U'}</AvatarFallback>
+          </Avatar>
+          <span>{user.username}</span>
         </div>
       </Button>
     )

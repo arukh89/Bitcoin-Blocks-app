@@ -1,0 +1,58 @@
+"use client"
+
+import React, { useEffect, useMemo } from "react"
+import { WagmiProvider, createConfig } from "wagmi"
+import { farcasterMiniApp as miniAppConnector } from "@farcaster/miniapp-wagmi-connector"
+import { base } from "viem/chains"
+import { http } from "viem"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { useAccount, useConnect } from "wagmi"
+
+// Export a singleton QueryClient to avoid duplicate caches
+const queryClient = new QueryClient()
+
+export const config = createConfig({
+  chains: [base],
+  transports: { [base.id]: http() },
+  connectors: [miniAppConnector()],
+  ssr: true,
+  multiInjectedProviderDiscovery: true,
+})
+
+function AutoConnect() {
+  const { isConnected } = useAccount()
+  const { connectors, connectAsync } = useConnect()
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (isConnected) return
+      try {
+        await import("@farcaster/miniapp-sdk")
+        // Prefer injected when available; in mini app, this binds to Farcaster provider + Warplet overlay
+        const injected = connectors.find((c) => c.id === "injected") || connectors[0]
+        if (!injected || cancelled) return
+        await connectAsync({ connector: injected })
+      } catch {
+        // no-op on web if Farcaster SDK not present / not in mini app
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isConnected, connectors, connectAsync])
+
+  return null
+}
+
+export function WagmiProviders({ children }: { children: React.ReactNode }) {
+  const qc = useMemo(() => queryClient, [])
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={qc}>
+        <AutoConnect />
+        {children}
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}

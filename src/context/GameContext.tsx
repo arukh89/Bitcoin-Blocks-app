@@ -7,6 +7,7 @@ import { useAuth, ADMIN_FIDS, isAdminFid, isAdminWallet, ADMIN_WALLETS } from '@
 
 // Real-time client import
 import { connectToSpacetime, type DbConnection } from '@/lib/spacetime-client'
+import { ensureWalletSession } from '@/lib/wallet-session'
 
 // Minimal table type placeholders; replaced by real types when generating bindings
 type STDBRound = {
@@ -827,6 +828,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // Gate: require wallet session (Warplet in mini app, injected on web)
+      const addr = await ensureWalletSession().catch(() => null)
+      if (!addr) {
+        return { success: false, error: 'Please connect wallet to check-in' }
+      }
       console.log('📝 [REALTIME] Performing check-in...', { userIdentifier, username })
       
       if (!('dailyCheckin' in ((client as any).reducers as any))) {
