@@ -28,7 +28,9 @@ function AutoConnect() {
     ;(async () => {
       if (isConnected) return
       try {
-        await import("@farcaster/miniapp-sdk")
+        const sdk = (await import("@farcaster/miniapp-sdk")).default
+        // Ensure we're actually in Farcaster Mini App; will throw on web
+        await sdk.actions.ready()
         // Prefer injected when available; in mini app, this binds to Farcaster provider + Warplet overlay
         const injected = connectors.find((c) => c.id === "injected") || connectors[0]
         if (!injected || cancelled) return
