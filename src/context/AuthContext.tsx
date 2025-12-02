@@ -128,23 +128,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithWallet = useCallback(async (address: string): Promise<void> => {
     try {
       console.log('💰 Wallet sign in:', address)
-      
-      // Create user from wallet address
-      const walletUser: User = {
+
+      // base wallet identity (fallback if no Farcaster match)
+      const short = `${address.slice(0, 6)}...${address.slice(-4)}`
+      const walletIsAdmin = isAdminWallet(address)
+      const baseUser: User = {
         address,
-        username: `${address.slice(0, 6)}...${address.slice(-4)}`,
-        displayName: `${address.slice(0, 6)}...${address.slice(-4)}`,
+        username: short,
+        displayName: short,
         pfpUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
-        // Wallet admins can access Admin UI; announcements remain FID-only in UI logic
-        isAdmin: isAdminWallet(address)
+        isAdmin: walletIsAdmin,
       }
-      
-      setUser(walletUser)
+
       setWalletAddress(address)
-      setAuthMode('wallet')
       setWalletChain(walletChain || 'base') // Default to base if not set
-      
-      console.log('✅ Wallet authentication successful')
+      setAuthMode('wallet')
+
+      // Try resolve wallet -> Farcaster
+      try {
+        const url = `/api/farcaster/resolve-by-address?address=${encodeURIComponent(address)}`
+        const res = await fetch(url)
+        if (res.ok) {
+          const data: any = await res.json()
+          if (data?.found && data?.fid) {
+            const fid: number = Number(data.fid)
+            const username: string = data.username || `user${fid}`
+            const pfpUrl: string = data.pfpUrl || baseUser.pfpUrl
+            const userFromFarcaster: User = {
+              address: `fid-${fid}`,
+              username,
+              displayName: data.displayName || username,
+              pfpUrl,
+              isAdmin: walletIsAdmin || isAdminFid(fid),
+            }
+            setUser(userFromFarcaster)
+            setUserFid(fid)
+            console.log('🔗 Resolved wallet -> Farcaster identity:', { fid, username })
+            return
+          }
+        }
+      } catch (e) {
+        console.warn('Resolver failed, using wallet identity', e)
+      }
+
+      // Fallback to plain wallet identity
+      setUser(baseUser)
+      setUserFid(null)
+      console.log('✅ Wallet authentication successful (no Farcaster linkage)')
     } catch (error) {
       console.error('❌ Wallet auth failed:', error)
       throw error

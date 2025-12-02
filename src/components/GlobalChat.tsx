@@ -175,9 +175,18 @@ export function GlobalChat() {
                       }`}>
                         @{msg.username}
                       </span>
-                      <span className="text-[10px] text-gray-500 font-mono">
-                        {msg.address.slice(0, 6)}...{msg.address.slice(-4)}
-                      </span>
+                      {(() => {
+                        const isFid = msg.address?.startsWith('fid-')
+                        const fidValue = isFid ? msg.address.slice(4) : null
+                        const shortWallet = !isFid
+                          ? `${msg.address.slice(0, 6)}...${msg.address.slice(-4)}`
+                          : null
+                        return (
+                          <span className="text-[10px] text-gray-500 font-mono whitespace-nowrap">
+                            {isFid ? `FID ${fidValue}` : shortWallet}
+                          </span>
+                        )
+                      })()}
                       {msg.type === 'winner' && (
                         <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-400/50 text-xs">
                           👑 Winner
