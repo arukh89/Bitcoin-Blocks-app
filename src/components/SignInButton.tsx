@@ -14,7 +14,7 @@ import { base, arbitrum } from 'wagmi/chains'
 import { motion } from 'framer-motion'
 
 export function SignInButton() {
-  const { user, authMode, isInFarcaster, signInWithNeynar, signInWithWallet, signOut, walletChain, setWalletChain } = useAuth()
+  const { user, authMode, isInFarcaster, signInWithWallet, signOut, walletChain, setWalletChain } = useAuth()
   const [showDialog, setShowDialog] = useState<boolean>(false)
   const [neynarUrl, setNeynarUrl] = useState<string>('')
   const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
@@ -35,8 +35,14 @@ export function SignInButton() {
       const skip = typeof window !== 'undefined' ? window.sessionStorage.getItem('bb_skip_auto_wallet') : null
       if (skip === '1') return
     } catch {}
+    
     didAutoWalletRef.current = true
-    void signInWithWallet(address)
+    
+    // Proper async handling with error recovery
+    signInWithWallet(address).catch((error) => {
+      console.error('Auto wallet login failed:', error)
+      didAutoWalletRef.current = false // Reset on error to allow retry
+    })
   }, [isConnected, address, user, isInFarcaster, signInWithWallet])
 
   const handleNeynarSignIn = async (): Promise<void> => {
@@ -50,14 +56,12 @@ export function SignInButton() {
         })
         return
       }
-      // Generate Neynar auth URL
-      const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin)}`
+      // Generate Neynar auth URL with callback route
+      const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/api/auth/neynar/callback')}`
       setNeynarUrl(authUrl)
       
-      // Open in new window for OAuth flow
-      window.open(authUrl, '_blank', 'width=500,height=700')
-      
-      await signInWithNeynar()
+      // Redirect to Neynar OAuth
+      window.location.href = authUrl
     } catch (error) {
       console.error('Neynar sign in failed:', error)
     }

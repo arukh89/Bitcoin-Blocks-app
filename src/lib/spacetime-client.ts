@@ -63,10 +63,20 @@ export async function connectToSpacetime(opts?: {
   // Prevent multiple simultaneous connection attempts
   if (isConnecting) {
     console.log('⏳ Connection already in progress, waiting...')
-    // Wait for existing connection attempt
-    while (isConnecting) {
+    const MAX_WAIT = 10000 // 10 seconds timeout
+    const startTime = Date.now()
+    
+    // Wait for existing connection attempt with timeout
+    while (isConnecting && (Date.now() - startTime) < MAX_WAIT) {
       await new Promise(resolve => setTimeout(resolve, 100))
     }
+    
+    if (isConnecting) {
+      connectionError = 'Connection timeout - another connection attempt is stuck'
+      isConnecting = false
+      throw new Error(connectionError)
+    }
+    
     if (dbConnection) return dbConnection
     if (connectionError) throw new Error(connectionError)
   }
