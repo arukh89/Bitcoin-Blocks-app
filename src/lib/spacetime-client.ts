@@ -10,13 +10,6 @@ import type { Identity } from 'spacetimedb'
 const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST
 const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME
 
-if (!SPACETIME_HOST) {
-  throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_HOST')
-}
-if (!SPACETIME_DB_NAME) {
-  throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_DB_NAME')
-}
-
 function normalizeWsHost(input: string): string {
   let h = input.trim()
   if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
@@ -34,9 +27,7 @@ function normalizeWsHost(input: string): string {
   return h
 }
 
-// Narrow to string after runtime guards
-const HOST = normalizeWsHost(SPACETIME_HOST as string)
-const DB_NAME = SPACETIME_DB_NAME as string
+// Defer env validation to runtime to avoid build-time crashes
 
 let dbConnection: DbConnType | null = null
 let isConnecting = false
@@ -51,6 +42,17 @@ export async function connectToSpacetime(opts?: {
   if (typeof window === 'undefined') {
     throw new Error('Spacetime client can only run in the browser')
   }
+  // Resolve env at call time (avoid crashing at import/build time)
+  const hostRaw = SPACETIME_HOST
+  const dbNameRaw = SPACETIME_DB_NAME
+  if (!hostRaw) {
+    throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_HOST')
+  }
+  if (!dbNameRaw) {
+    throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_DB_NAME')
+  }
+  const HOST = normalizeWsHost(hostRaw)
+  const DB_NAME = dbNameRaw
   // Return existing connection if available
   if (dbConnection) {
     console.log('♻️ Reusing existing SpacetimeDB connection')
