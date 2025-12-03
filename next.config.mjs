@@ -44,7 +44,6 @@ const nextConfig = {
       `connect-src ${connectSrc}`,
       "frame-ancestors 'self' https://warpcast.com https://*.warpcast.com https://farcaster.xyz https://*.farcaster.xyz",
     ].join('; ')
-
     return [
       {
         source: '/:path*',
