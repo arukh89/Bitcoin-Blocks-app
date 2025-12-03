@@ -739,7 +739,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await (client as any).reducers.endRoundManually(BigInt(roundId), (user?.address || ''))
+      await (client as any).reducers.endRoundManually(BigInt(roundId))
       console.log('✅ [REALTIME] Round ended!')
       return true
     } catch (error) {

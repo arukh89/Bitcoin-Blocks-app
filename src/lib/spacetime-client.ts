@@ -3,10 +3,11 @@ import 'client-only'
 import type { DbConnection as DbConnType, ErrorContext } from '@/spacetime_module_bindings'
 import type { Identity } from 'spacetimedb'
 
-// SpacetimeDB connection settings
-// IMPORTANT: Module must be published to SpacetimeDB Maincloud using CLI
+// SpacetimeDB connection settings — defer validation to runtime to avoid crashing UI at import time
+// IMPORTANT: Module must be published to SpacetimeDB Maincloud using official SDK
 // Using Maincloud (production-ready database)
 // Instructions: See DEPLOYMENT_GUIDE.md
+
 const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST
 const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME
 
