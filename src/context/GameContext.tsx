@@ -746,7 +746,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       console.error('❌ [REALTIME] Failed to end round:', error)
       return false
     }
-  }, [client, connected, rounds, user])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, connected, rounds])
 
   const updateRoundResult = useCallback(async (
     roundId: string, 

@@ -293,6 +293,10 @@ export function AdminPanel() {
       )
 
       const winner = sorted[0]
+      
+      if (!winner || !winner.address || !winner.username) {
+        throw new Error('No winner found - sorted results are empty or missing data')
+      }
 
       await updateRoundResult(closedRound.id, actualTxCount, blockHash, winner.address)
 

@@ -16,14 +16,15 @@ export async function getSpacetimeConnection(): Promise<DbConnection> {
     const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
     if (!HOST || !DB_NAME) throw new Error('SpacetimeDB not configured')
     const wsHost = normalizeWs(HOST)
-    connPromise = DbConnection.builder()
-      .withUri(wsHost)
-      .withModuleName(DB_NAME)
-      .build()
-      .then((conn) => {
-        try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
-        return conn
-      })
+    connPromise = Promise.resolve(
+      DbConnection.builder()
+        .withUri(wsHost)
+        .withModuleName(DB_NAME)
+        .build()
+    ).then((conn) => {
+      try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
+      return conn
+    })
   }
   return connPromise
 }
