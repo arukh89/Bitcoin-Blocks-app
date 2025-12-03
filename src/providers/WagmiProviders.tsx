@@ -17,7 +17,10 @@ const SELECTED_CHAIN = CHAIN_ID === baseSepolia.id ? baseSepolia : base
 
 export const config = createConfig({
   chains: [SELECTED_CHAIN],
-  transports: { [SELECTED_CHAIN.id]: http() },
+  transports: {
+    [base.id]: http(),
+    [baseSepolia.id]: http(),
+  },
   connectors: [miniAppConnector(), injected()],
   ssr: true,
   multiInjectedProviderDiscovery: true,
