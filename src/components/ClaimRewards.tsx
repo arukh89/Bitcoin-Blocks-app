@@ -15,7 +15,9 @@ export function ClaimRewards() {
   const { user } = useAuth()
   const { address } = useAccount()
   const { toast } = useToast()
-  const [submitting, setSubmitting] = useState(false)
+  const [_submittingFirst, setSubmittingFirst] = useState(false)
+  const [_submittingSecond, setSubmittingSecond] = useState(false)
+  const [_submittingJackpot, setSubmittingJackpot] = useState(false)
 
   const latestFinished = useMemo(() => {
     return [...rounds].filter(r => r.status === "finished").sort((a, b) => (b.endTime || 0) - (a.endTime || 0))[0] || null
@@ -39,7 +41,7 @@ export function ClaimRewards() {
   const handleClaimFirst = async (): Promise<void> => {
     if (!latestFinished) return
     try {
-      setSubmitting(true)
+      setSubmittingFirst(true)
       const walletAddr = await ensureWalletSession()
       const amount = prizeConfig ? prizeConfig.firstPlaceAmount : "0"
       // Derive FID from logged in user (AuthContext stores Farcaster id as address = 'fid-<num>')
@@ -76,14 +78,14 @@ export function ClaimRewards() {
     } catch (e: any) {
       toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
     } finally {
-      setSubmitting(false)
+      setSubmittingFirst(false)
     }
   }
 
   const handleClaimSecond = async (): Promise<void> => {
     if (!latestFinished) return
     try {
-      setSubmitting(true)
+      setSubmittingSecond(true)
       const walletAddr = await ensureWalletSession()
       const amount = prizeConfig ? prizeConfig.secondPlaceAmount : "0"
       const fid = (user?.address && user.address.startsWith('fid-')) ? user.address.slice(4) : undefined
@@ -109,14 +111,14 @@ export function ClaimRewards() {
     } catch (e: any) {
       toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
     } finally {
-      setSubmitting(false)
+      setSubmittingSecond(false)
     }
   }
 
   const handleClaimJackpot = async (): Promise<void> => {
     if (!latestFinished) return
     try {
-      setSubmitting(true)
+      setSubmittingJackpot(true)
       const walletAddr = await ensureWalletSession()
       const amount = prizeConfig ? prizeConfig.jackpotAmount : "0"
       const fid = (user?.address && user.address.startsWith('fid-')) ? user.address.slice(4) : undefined
@@ -142,11 +144,13 @@ export function ClaimRewards() {
     } catch (e: any) {
       toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
     } finally {
-      setSubmitting(false)
+      setSubmittingSecond(false)
     }
   }
 
   if (!latestFinished) return null
+
+  const isLoading = _submittingFirst || _submittingSecond || _submittingJackpot
 
   return (
     <Card className="glass-card border-2 border-emerald-500/40">
@@ -157,14 +161,18 @@ export function ClaimRewards() {
         <div className="text-sm text-gray-300">Latest finished round: #{latestFinished.roundNumber}</div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Button
-            disabled={!isWinnerFirst || submitting}
+            disabled={!isWinnerFirst || isLoading}
             onClick={handleClaimFirst}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {submitting ? "Processing..." : `Claim 1st • ${prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : ""} ${prizeConfig?.currencyType || ""}`}
+            {_submittingFirst ? "Processing..." : `Claim 1st • ${prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : ""} ${prizeConfig?.currencyType || ""}`}
           </Button>
-          <Button disabled={!isWinnerSecond || submitting} onClick={handleClaimSecond} className="bg-violet-600 hover:bg-violet-700">Claim 2nd</Button>
-          <Button disabled={!isJackpot || submitting} onClick={handleClaimJackpot} className="bg-amber-600 hover:bg-amber-700">Claim Jackpot</Button>
+          <Button disabled={!isWinnerSecond || isLoading} onClick={handleClaimSecond} className="bg-violet-600 hover:bg-violet-700">
+            {_submittingSecond ? "Processing..." : "Claim 2nd"}
+          </Button>
+          <Button disabled={!isJackpot || isLoading} onClick={handleClaimJackpot} className="bg-amber-600 hover:bg-amber-700">
+            {_submittingJackpot ? "Processing..." : "Claim Jackpot"}
+          </Button>
         </div>
         {!isWinnerFirst && (
           <div className="text-xs text-gray-400">You are not the recorded winner for the latest round.</div>

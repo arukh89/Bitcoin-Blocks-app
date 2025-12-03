@@ -699,20 +699,43 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Require FID-based address ("fid-<number>") for submissions
-      if (!address.startsWith('fid-')) {
-        console.warn('⚠️ [REALTIME] Guess requires Farcaster login (FID-only)')
-        return false
-      }
-      const fidNum = Number(address.slice(4))
-      if (!Number.isFinite(fidNum) || fidNum <= 0) {
-        console.warn('⚠️ [REALTIME] Invalid FID in address:', address)
-        return false
+      // Accept both FID and wallet addresses
+      let fidForSubmission: bigint
+
+      if (address.startsWith('fid-')) {
+        // Farcaster user
+        const fidNum = Number(address.slice(4))
+        if (!Number.isFinite(fidNum) || fidNum <= 0) {
+          console.warn('⚠️ [REALTIME] Invalid FID in address:', address)
+          return false
+        }
+        fidForSubmission = BigInt(fidNum)
+      } else {
+        // Wallet user - try resolve to FID, or use address hash as pseudo-FID
+        try {
+          const res = await fetch(`/api/farcaster/resolve-by-address?address=${encodeURIComponent(address)}`)
+          if (res.ok) {
+            const data = await res.json()
+            if (data?.found && data?.fid) {
+              fidForSubmission = BigInt(data.fid)
+              console.log('✅ [REALTIME] Resolved wallet to FID:', data.fid)
+            } else {
+              throw new Error('No FID found')
+            }
+          } else {
+            throw new Error('API call failed')
+          }
+        } catch (e) {
+          console.warn('Could not resolve wallet to FID, using address hash:', e)
+          // Use address hash as pseudo-FID (offset to avoid collision with real FIDs)
+          const addrNum = parseInt(address.slice(-8), 16)
+          fidForSubmission = BigInt(addrNum + 1000000000)
+        }
       }
 
       await (client as any).reducers.submitGuess(
         BigInt(roundId),
-        BigInt(fidNum),
+        fidForSubmission,
         username,
         BigInt(guess),
         pfpUrl || undefined
