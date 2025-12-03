@@ -775,7 +775,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     )
     
     console.log('✅ [REALTIME] Round result updated!')
-  }, [client, connected, user])
+  }, [client, connected])
 
   const getGuessesForRound = useCallback((roundId: string): Guess[] => {
     return guesses.filter(g => g.roundId === roundId)
@@ -810,7 +810,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       console.error('❌ [REALTIME] Failed to send chat message:', error)
       throw error
     }
-  }, [client, connected, user])
+  }, [client, connected])
 
   // NOTE: Removed client-side auto-close timer; server tick_rounds is the source of truth
 
