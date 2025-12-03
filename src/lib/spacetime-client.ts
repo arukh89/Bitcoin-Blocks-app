@@ -3,19 +3,13 @@ import 'client-only'
 import type { DbConnection as DbConnType, ErrorContext } from '@/spacetime_module_bindings'
 import type { Identity } from 'spacetimedb'
 
-// SpacetimeDB connection settings
-// IMPORTANT: Module must be published to SpacetimeDB Maincloud using CLI
+// SpacetimeDB connection settings — defer validation to runtime to avoid crashing UI at import time
+// IMPORTANT: Module must be published to SpacetimeDB Maincloud using official SDK
 // Using Maincloud (production-ready database)
 // Instructions: See DEPLOYMENT_GUIDE.md
+
 const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST
 const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME
-
-if (!SPACETIME_HOST) {
-  throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_HOST')
-}
-if (!SPACETIME_DB_NAME) {
-  throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_DB_NAME')
-}
 
 function normalizeWsHost(input: string): string {
   let h = input.trim()
@@ -34,10 +28,6 @@ function normalizeWsHost(input: string): string {
   return h
 }
 
-// Narrow to string after runtime guards
-const HOST = normalizeWsHost(SPACETIME_HOST as string)
-const DB_NAME = SPACETIME_DB_NAME as string
-
 let dbConnection: DbConnType | null = null
 let isConnecting = false
 let connectionError: string | null = null
@@ -51,6 +41,17 @@ export async function connectToSpacetime(opts?: {
   if (typeof window === 'undefined') {
     throw new Error('Spacetime client can only run in the browser')
   }
+  // Resolve env at call time (avoid crashing at import time)
+  const hostRaw = SPACETIME_HOST
+  const dbNameRaw = SPACETIME_DB_NAME
+  if (!hostRaw) {
+    throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_HOST')
+  }
+  if (!dbNameRaw) {
+    throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_DB_NAME')
+  }
+  const HOST = normalizeWsHost(hostRaw)
+  const DB_NAME = dbNameRaw
   // Return existing connection if available
   if (dbConnection) {
     console.log('♻️ Reusing existing SpacetimeDB connection')
