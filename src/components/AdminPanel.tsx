@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { useGame } from '@/context/GameContext'
 import type { ChatMessage } from '@/types/game'
 import { useAuth } from '@/context/AuthContext'
+import { calculateWinners } from '@/lib/winner-utils'
 import { useToast } from '@/hooks/use-toast'
 // Removed APP_CONFIG - using pure realtime mode
 
@@ -286,12 +287,10 @@ export function AdminPanel() {
         throw new Error('No predictions in this round')
       }
 
-      const sorted = [...guesses].sort((a, b) => {
-        const diffA = Math.abs(a.guess - actualTxCount)
-        const diffB = Math.abs(b.guess - actualTxCount)
-        if (diffA !== diffB) return diffA - diffB
-        return a.submittedAt - b.submittedAt
-      })
+      const sorted = calculateWinners(
+        guesses.map(g => ({ address: g.address, username: g.username, guess: BigInt(g.guess), submittedAt: BigInt(g.submittedAt) })),
+        BigInt(actualTxCount)
+      )
 
       const winner = sorted[0]
 

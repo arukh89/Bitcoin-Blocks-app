@@ -6,7 +6,8 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { RewardClaimerAbi } from '@/lib/abis/rewardClaimer'
-import { DbConnection } from '@/spacetime_module_bindings'
+import { getSpacetimeConnection } from '@/lib/spacetime-singleton'
+import { calculateWinners } from '@/lib/winner-utils'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -42,28 +43,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: 'Signer not configured' }, { status: 501 })
     }
     // --- Server-side validation against SpacetimeDB ---
-    const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
-    const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
-    if (!HOST || !DB_NAME) {
-      return NextResponse.json({ ok: false, error: 'SpacetimeDB not configured' }, { status: 500 })
-    }
-    const wsHost = (() => {
-      let h = HOST.trim()
-      if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
-      if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
-      if (!h.startsWith('ws://') && !h.startsWith('wss://')) h = 'wss://' + h.replace(/^\/+/, '')
-      return h
-    })()
-
-    const conn = await DbConnection.builder()
-      .withUri(wsHost)
-      .withModuleName(DB_NAME)
-      .build()
-
-    // Subscribe to all tables to fetch current state
-    try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
-    // very small delay to allow snapshot
-    await new Promise(r => setTimeout(r, 250))
+    const conn = await getSpacetimeConnection()
+    // tiny delay to ensure snapshot after subscribe
+    await new Promise(r => setTimeout(r, 150))
 
     const roundIdBn = BigInt(roundId)
     const roundsIter = Array.from(conn.db.rounds.iter()) as any[]
@@ -95,12 +77,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (!actualTx || roundGuesses.length === 0) {
         return NextResponse.json({ ok: false, error: 'Round results not available' }, { status: 409 })
       }
-      const sorted = roundGuesses.sort((a: any, b: any) => {
-        const da = (a.guess > actualTx ? a.guess - actualTx : actualTx - a.guess)
-        const db = (b.guess > actualTx ? b.guess - actualTx : actualTx - b.guess)
-        if (da !== db) return Number(da - db)
-        return Number(a.submittedAt - b.submittedAt)
-      })
+      const sorted = calculateWinners(roundGuesses, actualTx as bigint)
       const first = sorted[0]
       const second = sorted[1]
       if (rewardType === 'second') {
