@@ -7,8 +7,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'pbs.twimg.com' },
       { protocol: 'https', hostname: 'blob.vercel-storage.com' },
       { protocol: 'https', hostname: 'public.blob.vercel-storage.com' },
-      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' },
-    ],
+      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' }
+    ]
   },
   webpack: (config) => {
     config.resolve = config.resolve || {}
