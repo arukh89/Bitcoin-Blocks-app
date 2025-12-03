@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { ensureWalletSession } from "@/lib/wallet-session"
 import { useAccount } from "wagmi"
+import { calculateWinners } from "@/lib/winner-utils"
 
 export function ClaimRewards() {
   const { rounds, prizeConfig, guesses } = useGame()
@@ -21,17 +22,11 @@ export function ClaimRewards() {
   }, [rounds])
 
   const computedWinners = useMemo(() => {
-    if (!latestFinished || latestFinished.actualTxCount == null) return [] as { address: string; guess: number; submittedAt: number }[]
+    if (!latestFinished || latestFinished.actualTxCount == null) return [] as { address?: string; guess: bigint; submittedAt: bigint }[]
     const list = guesses
       .filter(g => g.roundId === latestFinished.id)
-      .map(g => ({ address: g.address, guess: g.guess, submittedAt: g.submittedAt }))
-      .sort((a, b) => {
-        const da = Math.abs(a.guess - (latestFinished.actualTxCount as number))
-        const db = Math.abs(b.guess - (latestFinished.actualTxCount as number))
-        if (da !== db) return da - db
-        return a.submittedAt - b.submittedAt
-      })
-    return list
+      .map(g => ({ address: g.address, guess: BigInt(g.guess), submittedAt: BigInt(g.submittedAt) }))
+    return calculateWinners(list, BigInt(latestFinished.actualTxCount))
   }, [guesses, latestFinished])
 
   const firstWinner = computedWinners[0]
@@ -39,7 +34,7 @@ export function ClaimRewards() {
 
   const isWinnerFirst = !!(user?.address && firstWinner && user.address === firstWinner.address)
   const isWinnerSecond = !!(user?.address && secondWinner && user.address === secondWinner.address)
-  const isJackpot = !!(firstWinner && latestFinished?.actualTxCount != null && firstWinner.guess === latestFinished.actualTxCount && user?.address === firstWinner.address)
+  const isJackpot = !!(firstWinner && latestFinished?.actualTxCount != null && firstWinner.guess === BigInt(latestFinished.actualTxCount) && user?.address === firstWinner.address)
 
   const handleClaimFirst = async (): Promise<void> => {
     if (!latestFinished) return
