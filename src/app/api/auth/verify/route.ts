@@ -31,15 +31,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Bind session to address
     const address = siwe.address
     const res = NextResponse.json({ ok: true, address })
+    const secure = process.env.NODE_ENV === 'production' || (process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ?? false)
     res.cookies.set('siwe_session', JSON.stringify({ address }), {
       httpOnly: true,
       sameSite: 'lax',
-      secure: true,
+      secure,
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     })
     // Clear nonce after use
-    res.cookies.set('siwe_nonce', '', { httpOnly: true, sameSite: 'lax', secure: true, path: '/', maxAge: 0 })
+    res.cookies.set('siwe_nonce', '', { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 0 })
     return res
   } catch (e) {
     console.error('SIWE verify error', e)
