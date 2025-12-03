@@ -771,8 +771,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       BigInt(roundId),
       BigInt(actualTxCount),
       blockHash,
-      BigInt(fidNum),
-      (user?.address || '')
+      BigInt(fidNum)
     )
     
     console.log('✅ [REALTIME] Round result updated!')
@@ -798,15 +797,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     try {
       console.log('📤 [REALTIME] Sending chat message...')
       
-      const adminIdentifier = (message.type === 'system' || message.type === 'winner') ? (user?.address || '') : message.address
       await (client as any).reducers.sendChatMessage(
         message.roundId,
         message.address,
         message.username,
         message.message,
         message.pfpUrl || '',
-        message.type,
-        adminIdentifier
+        message.type
       )
       console.log('✅ [REALTIME] Chat message sent!')
     } catch (error) {
