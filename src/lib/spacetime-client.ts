@@ -31,10 +31,42 @@ function normalizeWsHost(input: string): string {
 // Defer env validation to runtime to avoid build-time crashes
 
 let dbConnection: DbConnType | null = null
-let isConnecting = false
 let connectionError: string | null = null
-let retryCount = 0
+const connectionPromises = new Map<string, Promise<DbConnType>>()
 const MAX_RETRIES = 3
+let retryCount = 0
+
+async function createConnection(opts: { HOST: string; DB_NAME: string; onConnect?: () => void; onDisconnect?: () => void; }): Promise<DbConnType> {
+  const { HOST, DB_NAME, onConnect, onDisconnect } = opts
+
+  // Set timeout for connection
+  const connectionTimeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Connection timeout after 10 seconds')), 10000)
+  })
+
+  const { DbConnection } = await import('@/spacetime_module_bindings')
+  const connectionPromise = DbConnection.builder()
+    .withUri(HOST)
+    .withModuleName(DB_NAME)
+    .onConnect((_connection: DbConnType, identity: Identity, _token: string) => {
+      console.log('✅ Connected to SpacetimeDB')
+      console.log('Identity:', identity)
+      retryCount = 0
+      connectionError = null
+      try { onConnect?.() } catch (e) { console.warn('onConnect callback error', e) }
+    })
+    .onDisconnect((_ctx: ErrorContext, _error?: Error) => {
+      console.log('❌ Disconnected from SpacetimeDB')
+      dbConnection = null
+      try { onDisconnect?.() } catch (e) { console.warn('onDisconnect callback error', e) }
+    })
+    .build()
+
+  const conn = await Promise.race([connectionPromise, connectionTimeout])
+  dbConnection = conn
+  console.log('🎉 SpacetimeDB connection established!', { host: HOST, database: DB_NAME })
+  return conn
+}
 
 export async function connectToSpacetime(opts?: {
   onConnect?: () => void
@@ -60,66 +92,17 @@ export async function connectToSpacetime(opts?: {
     return dbConnection
   }
 
-  // Prevent multiple simultaneous connection attempts
-  if (isConnecting) {
-    console.log('⏳ Connection already in progress, waiting...')
-    const MAX_WAIT = 10000 // 10 seconds timeout
-    const startTime = Date.now()
-    
-    // Wait for existing connection attempt with timeout
-    while (isConnecting && (Date.now() - startTime) < MAX_WAIT) {
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
-    
-    if (isConnecting) {
-      connectionError = 'Connection timeout - another connection attempt is stuck'
-      isConnecting = false
-      throw new Error(connectionError)
-    }
-    
-    if (dbConnection) return dbConnection
-    if (connectionError) throw new Error(connectionError)
+  const connectionKey = `${HOST}__${DB_NAME}`
+  if (connectionPromises.has(connectionKey)) {
+    return connectionPromises.get(connectionKey)!
   }
 
-  try {
-    isConnecting = true
-    connectionError = null
-    console.log('🔌 Connecting to SpacetimeDB...')
-    console.log('Host:', HOST)
-    console.log('Database:', DB_NAME)
-    console.log(`Attempt ${retryCount + 1}/${MAX_RETRIES + 1}`)
-    
-    // Set timeout for connection
-    const connectionTimeout = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timeout after 10 seconds')), 10000)
-    })
+  const promise = createConnection({ HOST, DB_NAME, onConnect: opts?.onConnect, onDisconnect: opts?.onDisconnect })
+  connectionPromises.set(connectionKey, promise)
 
-    const { DbConnection } = await import('@/spacetime_module_bindings')
-    const connectionPromise = DbConnection.builder()
-      .withUri(HOST)
-      .withModuleName(DB_NAME)
-      .onConnect((_connection: DbConnType, identity: Identity, _token: string) => {
-        console.log('✅ Connected to SpacetimeDB')
-        console.log('Identity:', identity)
-        retryCount = 0 // Reset retry count on successful connection
-        connectionError = null
-        try { opts?.onConnect?.() } catch (e) { console.warn('onConnect callback error', e) }
-      })
-      .onDisconnect((_ctx: ErrorContext, _error?: Error) => {
-        console.log('❌ Disconnected from SpacetimeDB')
-        dbConnection = null
-        try { opts?.onDisconnect?.() } catch (e) { console.warn('onDisconnect callback error', e) }
-      })
-      .build()
-    
-    const conn = await Promise.race([connectionPromise, connectionTimeout])
-    
-    dbConnection = conn
-    console.log('🎉 SpacetimeDB connection established!')
-    console.log('📊 Module info:', {
-      host: HOST,
-      database: DB_NAME
-    })
+  try {
+    console.log('🔌 Connecting to SpacetimeDB...', { host: HOST, database: DB_NAME, attempt: `${retryCount + 1}/${MAX_RETRIES + 1}` })
+    const conn = await promise
     return conn
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
@@ -162,7 +145,7 @@ export async function connectToSpacetime(opts?: {
     
     throw new Error(`SpacetimeDB connection failed: ${errorMsg}`)
   } finally {
-    isConnecting = false
+    connectionPromises.delete(connectionKey)
   }
 }
 
@@ -175,7 +158,7 @@ export function getConnectionError(): string | null {
 }
 
 export function isConnectionReady(): boolean {
-  return dbConnection !== null && !isConnecting
+  return dbConnection !== null
 }
 
 export type { DbConnType as DbConnection }

@@ -10,6 +10,7 @@ import { useGame } from '@/context/GameContext'
 import type { ChatMessage } from '@/types/game'
 import { useAuth } from '@/context/AuthContext'
 import { calculateWinners } from '@/lib/winner-utils'
+import { validateRoundTiming } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 // Removed APP_CONFIG - using pure realtime mode
 
@@ -129,6 +130,17 @@ export function AdminPanel() {
 
     const now = Date.now()
     const endTime = now + (durationMin * 60 * 1000)
+    // Validate timing & overlapping with current rounds
+    try {
+      validateRoundTiming(now, endTime, rounds as any)
+    } catch (e) {
+      toast({
+        title: '⚠️ Invalid Timing',
+        description: e instanceof Error ? e.message : 'Invalid round timing',
+        variant: 'destructive'
+      })
+      return
+    }
     const prize = `${jackpotAmount} ${prizeCurrency}`
 
     try {

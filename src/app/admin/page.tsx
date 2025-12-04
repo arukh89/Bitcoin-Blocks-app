@@ -75,7 +75,7 @@ export default function AdminPage() {
     const now = Date.now()
     const endTime = now + (24 * 60 * 60 * 1000)
     const prize = `${jackpotAmount} ${jackpotCurrency}`
-    const nextRoundNumber = activeRound ? activeRound.roundNumber + 1 : 1
+    const nextRoundNumber = activeRound ? Number(activeRound.roundNumber) + 1 : 1
 
     try {
       setLoading(true)
