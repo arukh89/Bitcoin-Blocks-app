@@ -3,7 +3,33 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import sdk from '@farcaster/miniapp-sdk'
 import type { User } from '@/types/game'
-import { isAdminFid, isAdminWallet } from '@/lib/admin'
+
+// Admin lists from env (no hardcoded values)
+const FIDS_RAW = process.env.NEXT_PUBLIC_ADMIN_FIDS
+const WALLETS_RAW = process.env.NEXT_PUBLIC_ADMIN_WALLETS
+
+if (!FIDS_RAW) throw new Error('Missing env: NEXT_PUBLIC_ADMIN_FIDS')
+if (!WALLETS_RAW) throw new Error('Missing env: NEXT_PUBLIC_ADMIN_WALLETS')
+
+export const ADMIN_FIDS: number[] = FIDS_RAW.split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
+  .map(n => Number(n))
+  .filter(n => Number.isFinite(n) && n > 0)
+
+export function isAdminFid(fid: number): boolean {
+  return ADMIN_FIDS.includes(fid)
+}
+
+export const ADMIN_WALLETS: string[] = WALLETS_RAW.split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(s => /^0x[a-f0-9]{40}$/.test(s))
+
+export function isAdminWallet(address: string): boolean {
+  if (!address) return false
+  const a = address.toLowerCase()
+  return ADMIN_WALLETS.includes(a)
+}
 
 export type AuthMode = 'farcaster-sdk' | 'neynar' | 'wallet'
 

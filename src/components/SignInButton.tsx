@@ -14,12 +14,11 @@ import { base, arbitrum } from 'wagmi/chains'
 import { motion } from 'framer-motion'
 
 export function SignInButton() {
-  const { user, authMode, isInFarcaster, signInWithWallet, signOut, walletChain, setWalletChain } = useAuth()
+  const { user, authMode, isInFarcaster, signInWithNeynar, signInWithWallet, signOut, walletChain, setWalletChain } = useAuth()
   const [showDialog, setShowDialog] = useState<boolean>(false)
   const [neynarUrl, setNeynarUrl] = useState<string>('')
   const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
   const didAutoWalletRef = useRef(false)
-  const autoWalletTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
   
   // Wagmi hooks for wallet connection
@@ -29,34 +28,15 @@ export function SignInButton() {
 
   // Auto sign in when wallet connects (web only), guarded to avoid re-login after sign out
   useEffect(() => {
-    // debounce successive triggers
-    if (autoWalletTimeoutRef.current) {
-      clearTimeout(autoWalletTimeoutRef.current)
-    }
-
-    autoWalletTimeoutRef.current = setTimeout(() => {
-      if (didAutoWalletRef.current) return
-      if (!isConnected || !address || user) return
-      if (isInFarcaster) return // never auto wallet in mini app
-      try {
-        const skip = typeof window !== 'undefined' ? window.sessionStorage.getItem('bb_skip_auto_wallet') : null
-        if (skip === '1') return
-      } catch {}
-
-      didAutoWalletRef.current = true
-
-      // Proper async handling with error recovery
-      signInWithWallet(address).catch((error) => {
-        console.error('Auto wallet login failed:', error)
-        didAutoWalletRef.current = false // Reset on error to allow retry
-      })
-    }, 500)
-
-    return () => {
-      if (autoWalletTimeoutRef.current) {
-        clearTimeout(autoWalletTimeoutRef.current)
-      }
-    }
+    if (didAutoWalletRef.current) return
+    if (!isConnected || !address || user) return
+    if (isInFarcaster) return // never auto wallet in mini app
+    try {
+      const skip = typeof window !== 'undefined' ? window.sessionStorage.getItem('bb_skip_auto_wallet') : null
+      if (skip === '1') return
+    } catch {}
+    didAutoWalletRef.current = true
+    void signInWithWallet(address)
   }, [isConnected, address, user, isInFarcaster, signInWithWallet])
 
   const handleNeynarSignIn = async (): Promise<void> => {
@@ -70,12 +50,14 @@ export function SignInButton() {
         })
         return
       }
-      // Generate Neynar auth URL with callback route
-      const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin + '/api/auth/neynar/callback')}`
+      // Generate Neynar auth URL
+      const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin)}`
       setNeynarUrl(authUrl)
       
-      // Redirect to Neynar OAuth
-      window.location.href = authUrl
+      // Open in new window for OAuth flow
+      window.open(authUrl, '_blank', 'width=500,height=700')
+      
+      await signInWithNeynar()
     } catch (error) {
       console.error('Neynar sign in failed:', error)
     }
