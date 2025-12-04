@@ -106,8 +106,17 @@ export function ClaimRewards() {
         const j = await res.json().catch(() => ({}))
         throw new Error(j?.error || "Claim signing failed")
       }
-      await res.json()
+      const data = await res.json()
       toast({ title: "Signature ready", description: "Proceeding to onchain claim..." })
+      if (data?.tx?.to && data?.tx?.data) {
+        const params = [{ to: data.tx.to as `0x${string}`, data: data.tx.data as `0x${string}`, value: data.tx.value || "0x0" }]
+        const eth = (globalThis as any).ethereum
+        if (!eth) throw new Error("No wallet provider")
+        await eth.request({ method: "eth_sendTransaction", params })
+        toast({ title: "Claim submitted", description: "Transaction sent" })
+        return
+      }
+      toast({ title: "Received claim signature", description: "Complete onchain step from your wallet modal" })
     } catch (e: any) {
       toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
     } finally {
@@ -139,12 +148,21 @@ export function ClaimRewards() {
         const j = await res.json().catch(() => ({}))
         throw new Error(j?.error || "Claim signing failed")
       }
-      await res.json()
+      const data = await res.json()
       toast({ title: "Signature ready", description: "Proceeding to onchain claim..." })
+      if (data?.tx?.to && data?.tx?.data) {
+        const params = [{ to: data.tx.to as `0x${string}`, data: data.tx.data as `0x${string}`, value: data.tx.value || "0x0" }]
+        const eth = (globalThis as any).ethereum
+        if (!eth) throw new Error("No wallet provider")
+        await eth.request({ method: "eth_sendTransaction", params })
+        toast({ title: "Claim submitted", description: "Transaction sent" })
+        return
+      }
+      toast({ title: "Received claim signature", description: "Complete onchain step from your wallet modal" })
     } catch (e: any) {
       toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
     } finally {
-      setSubmittingSecond(false)
+      setSubmittingJackpot(false)
     }
   }
 
@@ -158,7 +176,7 @@ export function ClaimRewards() {
         <CardTitle className="text-white">Claim Rewards</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="text-sm text-gray-300">Latest finished round: #{latestFinished.roundNumber}</div>
+        <div className="text-sm text-gray-300">Latest finished round: #{String(latestFinished.roundNumber)}</div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Button
             disabled={!isWinnerFirst || isLoading}
