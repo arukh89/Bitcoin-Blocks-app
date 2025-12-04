@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useGame } from '@/context/GameContext'
-import type { ChatMessage } from '@/types/game'
 import { useAuth } from '@/context/AuthContext'
 import { calculateWinners } from '@/lib/winner-utils'
 import { validateRoundTiming } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { announceSystemMessage } from '@/lib/announce'
+import { recentBlocks, blockByHeight, txCountByHash } from '@/lib/mempool-client'
 // Removed APP_CONFIG - using pure realtime mode
 
 export function AdminPanel() {
@@ -154,7 +155,7 @@ export function AdminPanel() {
         .replace('{jackpot}', `${jackpotAmount} ${prizeCurrency}`)
         .replace('{block}', `#${blockNum}`)
         .replace('{duration}', String(durationMin))
-      await handleAnnounce(msg)
+      await announceSystemMessage(msg, user!, { addChatMessage, getBool })
       
       toast({
         title: '✅ Round Started',
@@ -259,17 +260,11 @@ export function AdminPanel() {
 
       // 1) Try recent blocks list
       try {
-        const recentRes = await fetch('/api/mempool?action=recent-blocks')
-        if (recentRes.ok) {
-          const recentBlocks = await recentRes.json() as Array<{ height: number, hash: string }>
-          const found = recentBlocks.find(b => b.height === closedRound.blockNumber)
-          if (found) {
-            blockHash = found.hash
-            const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
-            if (!txRes.ok) throw new Error('Failed to fetch transaction count')
-            const { txCount } = await (txRes.json() as Promise<{ txCount: number }>)
-            actualTxCount = txCount
-          }
+        const blocks = await recentBlocks()
+        const found = blocks.find(b => b.height === closedRound.blockNumber)
+        if (found) {
+          blockHash = found.hash
+          actualTxCount = await txCountByHash(blockHash)
         }
       } catch (e) {
         // Non-fatal; we'll fall back below
@@ -277,20 +272,9 @@ export function AdminPanel() {
 
       // 2) Fallback: resolve by explicit block height
       if (!blockHash) {
-        const byHeight = await fetch(`/api/mempool?action=block-by-height&height=${closedRound.blockNumber}`)
-        if (!byHeight.ok) {
-          throw new Error(`Block #${closedRound.blockNumber} not found yet. Try again later.`)
-        }
-        const data = await byHeight.json() as { blockHash: string, txCount?: number }
+        const data = await blockByHeight(closedRound.blockNumber)
         blockHash = data.blockHash
-        if (typeof data.txCount === 'number') {
-          actualTxCount = data.txCount
-        } else {
-          const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
-          if (!txRes.ok) throw new Error('Failed to fetch transaction count')
-          const { txCount } = await (txRes.json() as Promise<{ txCount: number }>)
-          actualTxCount = txCount
-        }
+        actualTxCount = typeof data.txCount === 'number' ? data.txCount : await txCountByHash(blockHash)
       }
 
       // Find winners
@@ -318,7 +302,7 @@ export function AdminPanel() {
         .replace('{block}', `#${closedRound.blockNumber}`)
         .replace('{txCount}', actualTxCount.toLocaleString())
         .replace('{winner}', winner.username)
-      await handleAnnounce(message)
+      await announceSystemMessage(message, user!, { addChatMessage, getBool })
 
       toast({
         title: '🎉 Results Posted!',
@@ -335,32 +319,7 @@ export function AdminPanel() {
     }
   }
 
-  const handleAnnounce = async (message: string): Promise<void> => {
-    if (!user?.isAdmin) {
-      console.warn('⚠️ Non-admin tried to announce')
-      return
-    }
-
-    try {
-      // Gate by FID-only depending on setting (default true)
-      const requiresFid = getBool('admin_announce_requires_fid', true)
-      if (requiresFid && !user.address.startsWith('fid-')) return
-
-      const chatMsg: ChatMessage = {
-        id: `sys-${Date.now()}`,
-        roundId: 'global',
-        address: user.address,
-        username: user.username,
-        message,
-        pfpUrl: user.pfpUrl,
-        timestamp: Date.now(),
-        type: 'system'
-      }
-      await addChatMessage(chatMsg)
-    } catch (error) {
-      console.error('Announcement error:', error)
-    }
-  }
+  // Announcement handled via announceSystemMessage helper
 
   const handleSavePrizeConfig = async (): Promise<void> => {
     if (!client || !connected) {
@@ -449,21 +408,18 @@ export function AdminPanel() {
     const checkBlock = async (): Promise<boolean> => {
       try {
         // Fast path: check recent blocks list
-        const response = await fetch('/api/mempool?action=recent-blocks')
-        if (response.ok) {
-          const blocks = await response.json() as Array<{ height: number }>
-          const exists = blocks.some(b => b.height === targetBlock)
-          if (exists) {
-            console.log(`✅ Block #${targetBlock} is now available (recent-blocks)!`)
-            return true
-          }
-        }
-        // Fallback: resolve by height explicitly
-        const byHeight = await fetch(`/api/mempool?action=block-by-height&height=${targetBlock}`)
-        if (byHeight.ok) {
-          console.log(`✅ Block #${targetBlock} is now available (block-by-height)!`)
+        const blocks = await recentBlocks()
+        const exists = blocks.some(b => b.height === targetBlock)
+        if (exists) {
+          console.log(`✅ Block #${targetBlock} is now available (recent-blocks)!`)
           return true
         }
+        // Fallback: resolve by height explicitly
+        try {
+          await blockByHeight(targetBlock)
+          console.log(`✅ Block #${targetBlock} is now available (block-by-height)!`)
+          return true
+        } catch {}
         return false
       } catch (error) {
         console.log(`⏳ Block #${targetBlock} not yet available...`)
