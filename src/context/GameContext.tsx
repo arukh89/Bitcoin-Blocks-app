@@ -72,7 +72,7 @@ interface GameContextType {
   updateRoundResult: (roundId: string, actualTxCount: number, blockHash: string, winningAddress: string) => Promise<void>
   getGuessesForRound: (roundId: string) => Guess[]
   hasUserGuessed: (roundId: string, address: string) => boolean
-  addChatMessage: (message: ChatMessage) => void
+  addChatMessage: (message: ChatMessage) => Promise<void>
   connected: boolean
   client: DbConnection | null
   // Settings
