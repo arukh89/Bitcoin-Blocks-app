@@ -1,4 +1,4 @@
-// RewardClaimer ABI provided by user
+﻿// RewardClaimer ABI provided by user
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const RewardClaimerAbi: any = [
   {
@@ -116,7 +116,7 @@ export const RewardClaimerAbi: any = [
     "inputs": [],
     "name": "signer",
     "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "stateMutility": "view",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -127,3 +127,4 @@ export const RewardClaimerAbi: any = [
     "type": "function"
   }
 ]
+
