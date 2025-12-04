@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 import { SignInButton } from '@/components/SignInButton'
 import { GlobalChat } from '@/components/GlobalChat'
-import { AdminPanel } from '@/components/AdminPanel'
 import { GuessForm } from '@/components/GuessForm'
 import { Leaderboard } from '@/components/Leaderboard'
 import { AllPredictions } from '@/components/AllPredictions'
@@ -22,14 +21,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
 import { useAuth } from '@/context/AuthContext'
-import sdk from "@farcaster/miniapp-sdk"
+import Link from 'next/link'
 import { useAddMiniApp } from "@/hooks/useAddMiniApp";
 import { useQuickAuth } from "@/hooks/useQuickAuth";
 import { useIsInFarcaster } from "@/hooks/useIsInFarcaster";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false)
   const { connected, prizeConfig, getSetting } = useGame()
   const { user } = useAuth()
     const { addMiniApp } = useAddMiniApp();
@@ -50,36 +48,7 @@ export default function Home() {
       tryAddMiniApp()
     }, [addMiniApp])
   
-  useEffect(() => {
-    const initializeFarcaster = async () => {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 100))
-        if (document.readyState !== 'complete') {
-          await new Promise(resolve => {
-            if (document.readyState === 'complete') {
-              resolve(void 0)
-            } else {
-              window.addEventListener('load', () => resolve(void 0), { once: true })
-            }
-          })
-        }
-
-        await sdk.actions.ready()
-        console.log("Farcaster SDK initialized successfully - app fully loaded")
-      } catch (error) {
-        console.error('Failed to initialize Farcaster SDK:', error)
-        setTimeout(async () => {
-          try {
-            await sdk.actions.ready()
-            console.log('Farcaster SDK initialized on retry')
-          } catch (retryError) {
-            console.error('Farcaster SDK retry failed:', retryError)
-          }
-        }, 1000)
-      }
-    }
-    initializeFarcaster()
-  }, [])
+  // Farcaster SDK initialization centralized in AuthContext; no per-page init here
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -177,6 +146,13 @@ export default function Home() {
                     {connected ? 'Connected' : 'Disconnected'}
                   </Badge>
                 </motion.div>
+                {user?.isAdmin && (
+                  <Link href="/admin">
+                    <Button className="bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold">
+                      🛠️ Admin
+                    </Button>
+                  </Link>
+                )}
                 <SignInButton />
               </div>
             </motion.div>
@@ -294,27 +270,7 @@ export default function Home() {
             >
               <RecentBlocks />
             </motion.div>
-
-            {/* Admin Panel Toggle Button */}
-            {user?.isAdmin && (
-              <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.85 }}
-                className="flex justify-center"
-              >
-                <Button
-                  onClick={() => setShowAdminPanel(!showAdminPanel)}
-                  className="bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold px-6 py-3 shadow-2xl shadow-yellow-500/30"
-                >
-                  {showAdminPanel ? '🔼 Hide Admin Panel' : '🛠️ Show Admin Panel'}
-                </Button>
-              </motion.div>
-            )}
-
-            {/* Admin Panel - Conditionally shown */}
-            {user?.isAdmin && showAdminPanel && <AdminPanel />}
-
+            
           </div>
         </motion.main>
       )}
