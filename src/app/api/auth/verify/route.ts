@@ -1,15 +1,21 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { SiweMessage } from 'siwe'
+import { z } from 'zod'
+import { validateInput } from '@/lib/validation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const bodySchema = z.object({
+  message: z.string().min(1),
+  signature: z.string().min(1)
+})
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const { message, signature } = await req.json() as { message: string; signature: string }
-    if (!message || !signature) {
-      return NextResponse.json({ ok: false, error: 'Missing message or signature' }, { status: 400 })
-    }
+    const { valid, data, error } = await validateInput(bodySchema)(req)
+    if (!valid) return NextResponse.json({ ok: false, error: String(error) }, { status: 400 })
+    const { message, signature } = data
 
     const domain = process.env.AUTH_DOMAIN
     const origin = process.env.NEXT_PUBLIC_APP_URL

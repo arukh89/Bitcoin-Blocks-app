@@ -19,6 +19,7 @@ export function SignInButton() {
   const [neynarUrl, setNeynarUrl] = useState<string>('')
   const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
   const didAutoWalletRef = useRef(false)
+  const autoWalletTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
   
   // Wagmi hooks for wallet connection
@@ -28,21 +29,34 @@ export function SignInButton() {
 
   // Auto sign in when wallet connects (web only), guarded to avoid re-login after sign out
   useEffect(() => {
-    if (didAutoWalletRef.current) return
-    if (!isConnected || !address || user) return
-    if (isInFarcaster) return // never auto wallet in mini app
-    try {
-      const skip = typeof window !== 'undefined' ? window.sessionStorage.getItem('bb_skip_auto_wallet') : null
-      if (skip === '1') return
-    } catch {}
-    
-    didAutoWalletRef.current = true
-    
-    // Proper async handling with error recovery
-    signInWithWallet(address).catch((error) => {
-      console.error('Auto wallet login failed:', error)
-      didAutoWalletRef.current = false // Reset on error to allow retry
-    })
+    // debounce successive triggers
+    if (autoWalletTimeoutRef.current) {
+      clearTimeout(autoWalletTimeoutRef.current)
+    }
+
+    autoWalletTimeoutRef.current = setTimeout(() => {
+      if (didAutoWalletRef.current) return
+      if (!isConnected || !address || user) return
+      if (isInFarcaster) return // never auto wallet in mini app
+      try {
+        const skip = typeof window !== 'undefined' ? window.sessionStorage.getItem('bb_skip_auto_wallet') : null
+        if (skip === '1') return
+      } catch {}
+
+      didAutoWalletRef.current = true
+
+      // Proper async handling with error recovery
+      signInWithWallet(address).catch((error) => {
+        console.error('Auto wallet login failed:', error)
+        didAutoWalletRef.current = false // Reset on error to allow retry
+      })
+    }, 500)
+
+    return () => {
+      if (autoWalletTimeoutRef.current) {
+        clearTimeout(autoWalletTimeoutRef.current)
+      }
+    }
   }, [isConnected, address, user, isInFarcaster, signInWithWallet])
 
   const handleNeynarSignIn = async (): Promise<void> => {

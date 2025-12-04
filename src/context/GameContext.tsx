@@ -111,7 +111,7 @@ function toMillis(bigintSeconds: bigint): number {
 function convertRound(r: STDBRound): Round {
   return {
     id: String(r.roundId),
-    roundNumber: Number(r.roundNumber),
+    roundNumber: BigInt(r.roundNumber),
     startTime: toMillis(r.startTime),
     endTime: toMillis(r.endTime),
     prize: r.prize,

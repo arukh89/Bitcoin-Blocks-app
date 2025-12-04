@@ -8,24 +8,25 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { RewardClaimerAbi } from '@/lib/abis/rewardClaimer'
 import { getSpacetimeConnection } from '@/lib/spacetime-singleton'
 import { calculateWinners } from '@/lib/winner-utils'
+import { z } from 'zod'
+import { validateInput } from '@/lib/validation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-type Body = {
-  roundId: string
-  rewardType: 'first' | 'second' | 'jackpot'
-  recipient: string
-  amount: string
-  fid?: string | number
-}
+const bodySchema = z.object({
+  roundId: z.string().min(1),
+  rewardType: z.enum(['first', 'second', 'jackpot']),
+  recipient: z.string().min(1),
+  amount: z.string().regex(/^\d+$/, 'amount must be integer string'),
+  fid: z.union([z.string(), z.number()]).optional(),
+})
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const { roundId, rewardType, recipient, amount, fid } = (await req.json()) as Body
-    if (!roundId || !rewardType || !recipient || !amount) {
-      return NextResponse.json({ ok: false, error: 'Missing fields' }, { status: 400 })
-    }
+    const { valid, data, error } = await validateInput(bodySchema)(req)
+    if (!valid) return NextResponse.json({ ok: false, error: String(error) }, { status: 400 })
+    const { roundId, rewardType, recipient, amount, fid } = data
     if (!isAddress(recipient)) {
       return NextResponse.json({ ok: false, error: 'Invalid address' }, { status: 400 })
     }
@@ -148,7 +149,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })
 
     // Prepare encoded tx for convenience
-    const data = encodeFunctionData({
+    const txData = encodeFunctionData({
       abi: RewardClaimerAbi,
       functionName: 'claim',
       args: [
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       signature,
       claim: message,
       domain,
-      tx: { to: contractAddress, data, chainId },
+      tx: { to: contractAddress, data: txData, chainId },
     })
   } catch (e) {
     return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })
