@@ -3,48 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import sdk from '@farcaster/miniapp-sdk'
 import type { User } from '@/types/game'
-
-// Admin lists from env (safe parsing; do not crash UI if missing)
-const FIDS_RAW = process.env.NEXT_PUBLIC_ADMIN_FIDS
-const WALLETS_RAW = process.env.NEXT_PUBLIC_ADMIN_WALLETS
-
-function parseAdminFids(raw?: string): number[] {
-  if (!raw) {
-    if (typeof window !== 'undefined') console.warn('Missing env: NEXT_PUBLIC_ADMIN_FIDS (defaulting to empty)')
-    return []
-  }
-  return raw
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-    .map(n => Number(n))
-    .filter(n => Number.isFinite(n) && n > 0)
-}
-
-function parseAdminWallets(raw?: string): string[] {
-  if (!raw) {
-    if (typeof window !== 'undefined') console.warn('Missing env: NEXT_PUBLIC_ADMIN_WALLETS (defaulting to empty)')
-    return []
-  }
-  return raw
-    .split(',')
-    .map(s => s.trim().toLowerCase())
-    .filter(s => /^0x[a-f0-9]{40}$/.test(s))
-}
-
-export const ADMIN_FIDS: number[] = parseAdminFids(FIDS_RAW)
-
-export function isAdminFid(fid: number): boolean {
-  return ADMIN_FIDS.includes(fid)
-}
-
-export const ADMIN_WALLETS: string[] = parseAdminWallets(WALLETS_RAW)
-
-export function isAdminWallet(address: string): boolean {
-  if (!address) return false
-  const a = address.toLowerCase()
-  return ADMIN_WALLETS.includes(a)
-}
+import { isAdminFid, isAdminWallet } from '@/lib/admin'
 
 export type AuthMode = 'farcaster-sdk' | 'neynar' | 'wallet'
 

@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { Round, Guess, Log, ChatMessage, PrizeConfiguration } from '@/types/game'
 import type { UserStats, CheckInRecord, WeeklyLeaderboardEntry, CheckInResult } from '@/types/checkin'
-import { useAuth, ADMIN_FIDS, isAdminFid, isAdminWallet, ADMIN_WALLETS } from '@/context/AuthContext'
+import { useAuth } from '@/context/AuthContext'
+import { ADMIN_FIDS, ADMIN_WALLETS, isAdminFid, isAdminWallet, isAdminAddress } from '@/lib/admin'
 
 // Real-time client import
 import { connectToSpacetime, type DbConnection } from '@/lib/spacetime-client'
@@ -71,7 +72,7 @@ interface GameContextType {
   updateRoundResult: (roundId: string, actualTxCount: number, blockHash: string, winningAddress: string) => Promise<void>
   getGuessesForRound: (roundId: string) => Guess[]
   hasUserGuessed: (roundId: string, address: string) => boolean
-  addChatMessage: (message: ChatMessage) => void
+  addChatMessage: (message: ChatMessage) => Promise<void>
   connected: boolean
   client: DbConnection | null
   // Settings
@@ -90,18 +91,7 @@ const GameContext = createContext<GameContextType | undefined>(undefined)
 
 export { ADMIN_FIDS, isAdminFid, ADMIN_WALLETS, isAdminWallet }
 
-export function isDevAddress(addr: string): boolean {
-  if (!addr) return false
-  if (addr.startsWith('fid-')) {
-    const fid = Number(addr.slice(4))
-    return isAdminFid(fid)
-  }
-  // Wallet admin support
-  if (/^0x[a-fA-F0-9]{40}$/.test(addr)) {
-    return isAdminWallet(addr)
-  }
-  return false
-}
+export function isDevAddress(addr: string): boolean { return isAdminAddress(addr) }
 
 // Convert SpacetimeDB bigint timestamps to JS milliseconds
 function toMillis(bigintSeconds: bigint): number {

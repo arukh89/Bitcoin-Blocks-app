@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { baseCookieOptions } from '@/lib/cookies'
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams
@@ -34,12 +35,7 @@ export async function GET(req: NextRequest) {
       fid: user.fid,
       username: user.username,
       pfpUrl: user.pfp_url,
-    }), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-    })
+    }), baseCookieOptions({ maxAge: 60 * 60 * 24 * 7 }))
 
     return res
   } catch (error) {
@@ -47,3 +43,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/?error=auth_failed', req.url))
   }
 }
+
