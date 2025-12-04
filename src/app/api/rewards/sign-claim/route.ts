@@ -6,27 +6,25 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { RewardClaimerAbi } from '@/lib/abis/rewardClaimer'
-import { getSpacetimeConnection } from '@/lib/spacetime-singleton'
-import { calculateWinners } from '@/lib/winner-utils'
-import { z } from 'zod'
-import { validateInput } from '@/lib/validation'
+import { DbConnection } from '@/spacetime_module_bindings'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const bodySchema = z.object({
-  roundId: z.string().min(1),
-  rewardType: z.enum(['first', 'second', 'jackpot']),
-  recipient: z.string().min(1),
-  amount: z.string().regex(/^\d+$/, 'amount must be integer string'),
-  fid: z.union([z.string(), z.number()]).optional(),
-})
+type Body = {
+  roundId: string
+  rewardType: 'first' | 'second' | 'jackpot'
+  recipient: string
+  amount: string
+  fid?: string | number
+}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const { valid, data, error } = await validateInput(bodySchema)(req)
-    if (!valid) return NextResponse.json({ ok: false, error: String(error) }, { status: 400 })
-    const { roundId, rewardType, recipient, amount, fid } = data
+    const { roundId, rewardType, recipient, amount, fid } = (await req.json()) as Body
+    if (!roundId || !rewardType || !recipient || !amount) {
+      return NextResponse.json({ ok: false, error: 'Missing fields' }, { status: 400 })
+    }
     if (!isAddress(recipient)) {
       return NextResponse.json({ ok: false, error: 'Invalid address' }, { status: 400 })
     }
@@ -44,9 +42,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: 'Signer not configured' }, { status: 501 })
     }
     // --- Server-side validation against SpacetimeDB ---
-    const conn = await getSpacetimeConnection()
-    // tiny delay to ensure snapshot after subscribe
-    await new Promise(r => setTimeout(r, 150))
+    const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
+    const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
+    if (!HOST || !DB_NAME) {
+      return NextResponse.json({ ok: false, error: 'SpacetimeDB not configured' }, { status: 500 })
+    }
+    const wsHost = (() => {
+      let h = HOST.trim()
+      if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
+      if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
+      if (!h.startsWith('ws://') && !h.startsWith('wss://')) h = 'wss://' + h.replace(/^\/+/, '')
+      return h
+    })()
+
+    const conn = await DbConnection.builder()
+      .withUri(wsHost)
+      .withModuleName(DB_NAME)
+      .build()
+
+    // Subscribe to all tables to fetch current state
+    try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
+    // very small delay to allow snapshot
+    await new Promise(r => setTimeout(r, 250))
 
     const roundIdBn = BigInt(roundId)
     const roundsIter = Array.from(conn.db.rounds.iter()) as any[]
@@ -78,7 +95,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (!actualTx || roundGuesses.length === 0) {
         return NextResponse.json({ ok: false, error: 'Round results not available' }, { status: 409 })
       }
-      const sorted = calculateWinners(roundGuesses, actualTx as bigint)
+      const sorted = roundGuesses.sort((a: any, b: any) => {
+        const da = (a.guess > actualTx ? a.guess - actualTx : actualTx - a.guess)
+        const db = (b.guess > actualTx ? b.guess - actualTx : actualTx - b.guess)
+        if (da !== db) return Number(da - db)
+        return Number(a.submittedAt - b.submittedAt)
+      })
       const first = sorted[0]
       const second = sorted[1]
       if (rewardType === 'second') {
@@ -149,7 +171,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })
 
     // Prepare encoded tx for convenience
-    const txData = encodeFunctionData({
+    const data = encodeFunctionData({
       abi: RewardClaimerAbi,
       functionName: 'claim',
       args: [
@@ -169,7 +191,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       signature,
       claim: message,
       domain,
-      tx: { to: contractAddress, data: txData, chainId },
+      tx: { to: contractAddress, data, chainId },
     })
   } catch (e) {
     return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })

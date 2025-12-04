@@ -3,8 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { Round, Guess, Log, ChatMessage, PrizeConfiguration } from '@/types/game'
 import type { UserStats, CheckInRecord, WeeklyLeaderboardEntry, CheckInResult } from '@/types/checkin'
-import { useAuth } from '@/context/AuthContext'
-import { ADMIN_FIDS, ADMIN_WALLETS, isAdminFid, isAdminWallet, isAdminAddress } from '@/lib/admin'
+import { useAuth, ADMIN_FIDS, isAdminFid, isAdminWallet, ADMIN_WALLETS } from '@/context/AuthContext'
 
 // Real-time client import
 import { connectToSpacetime, type DbConnection } from '@/lib/spacetime-client'
@@ -72,7 +71,7 @@ interface GameContextType {
   updateRoundResult: (roundId: string, actualTxCount: number, blockHash: string, winningAddress: string) => Promise<void>
   getGuessesForRound: (roundId: string) => Guess[]
   hasUserGuessed: (roundId: string, address: string) => boolean
-  addChatMessage: (message: ChatMessage) => Promise<void>
+  addChatMessage: (message: ChatMessage) => void
   connected: boolean
   client: DbConnection | null
   // Settings
@@ -91,7 +90,18 @@ const GameContext = createContext<GameContextType | undefined>(undefined)
 
 export { ADMIN_FIDS, isAdminFid, ADMIN_WALLETS, isAdminWallet }
 
-export function isDevAddress(addr: string): boolean { return isAdminAddress(addr) }
+export function isDevAddress(addr: string): boolean {
+  if (!addr) return false
+  if (addr.startsWith('fid-')) {
+    const fid = Number(addr.slice(4))
+    return isAdminFid(fid)
+  }
+  // Wallet admin support
+  if (/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+    return isAdminWallet(addr)
+  }
+  return false
+}
 
 // Convert SpacetimeDB bigint timestamps to JS milliseconds
 function toMillis(bigintSeconds: bigint): number {
@@ -101,7 +111,7 @@ function toMillis(bigintSeconds: bigint): number {
 function convertRound(r: STDBRound): Round {
   return {
     id: String(r.roundId),
-    roundNumber: BigInt(r.roundNumber),
+    roundNumber: Number(r.roundNumber),
     startTime: toMillis(r.startTime),
     endTime: toMillis(r.endTime),
     prize: r.prize,
@@ -689,43 +699,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Accept both FID and wallet addresses
-      let fidForSubmission: bigint
-
-      if (address.startsWith('fid-')) {
-        // Farcaster user
-        const fidNum = Number(address.slice(4))
-        if (!Number.isFinite(fidNum) || fidNum <= 0) {
-          console.warn('⚠️ [REALTIME] Invalid FID in address:', address)
-          return false
-        }
-        fidForSubmission = BigInt(fidNum)
-      } else {
-        // Wallet user - try resolve to FID, or use address hash as pseudo-FID
-        try {
-          const res = await fetch(`/api/farcaster/resolve-by-address?address=${encodeURIComponent(address)}`)
-          if (res.ok) {
-            const data = await res.json()
-            if (data?.found && data?.fid) {
-              fidForSubmission = BigInt(data.fid)
-              console.log('✅ [REALTIME] Resolved wallet to FID:', data.fid)
-            } else {
-              throw new Error('No FID found')
-            }
-          } else {
-            throw new Error('API call failed')
-          }
-        } catch (e) {
-          console.warn('Could not resolve wallet to FID, using address hash:', e)
-          // Use address hash as pseudo-FID (offset to avoid collision with real FIDs)
-          const addrNum = parseInt(address.slice(-8), 16)
-          fidForSubmission = BigInt(addrNum + 1000000000)
-        }
+      // Require FID-based address ("fid-<number>") for submissions
+      if (!address.startsWith('fid-')) {
+        console.warn('⚠️ [REALTIME] Guess requires Farcaster login (FID-only)')
+        return false
+      }
+      const fidNum = Number(address.slice(4))
+      if (!Number.isFinite(fidNum) || fidNum <= 0) {
+        console.warn('⚠️ [REALTIME] Invalid FID in address:', address)
+        return false
       }
 
       await (client as any).reducers.submitGuess(
         BigInt(roundId),
-        fidForSubmission,
+        BigInt(fidNum),
         username,
         BigInt(guess),
         pfpUrl || undefined
@@ -752,15 +739,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await (client as any).reducers.endRoundManually(BigInt(roundId))
+      await (client as any).reducers.endRoundManually(BigInt(roundId), (user?.address || ''))
       console.log('✅ [REALTIME] Round ended!')
       return true
     } catch (error) {
       console.error('❌ [REALTIME] Failed to end round:', error)
       return false
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, connected, rounds])
+  }, [client, connected, rounds, user])
 
   const updateRoundResult = useCallback(async (
     roundId: string, 
@@ -789,7 +775,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     )
     
     console.log('✅ [REALTIME] Round result updated!')
-  }, [client, connected])
+  }, [client, connected, user])
 
   const getGuessesForRound = useCallback((roundId: string): Guess[] => {
     return guesses.filter(g => g.roundId === roundId)
@@ -824,7 +810,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       console.error('❌ [REALTIME] Failed to send chat message:', error)
       throw error
     }
-  }, [client, connected])
+  }, [client, connected, user])
 
   // NOTE: Removed client-side auto-close timer; server tick_rounds is the source of truth
 

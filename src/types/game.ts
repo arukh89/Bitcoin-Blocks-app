@@ -8,7 +8,7 @@ export interface User {
 
 export interface Round {
   id: string;
-  roundNumber: bigint;
+  roundNumber: number;
   startTime: number;
   endTime: number;
   prize: string;

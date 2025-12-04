@@ -1,22 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { SiweMessage } from 'siwe'
-import { z } from 'zod'
-import { validateInput } from '@/lib/validation'
-import { baseCookieOptions } from '@/lib/cookies'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const bodySchema = z.object({
-  message: z.string().min(1),
-  signature: z.string().min(1)
-})
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const { valid, data, error } = await validateInput(bodySchema)(req)
-    if (!valid) return NextResponse.json({ ok: false, error: String(error) }, { status: 400 })
-    const { message, signature } = data
+    const { message, signature } = await req.json() as { message: string; signature: string }
+    if (!message || !signature) {
+      return NextResponse.json({ ok: false, error: 'Missing message or signature' }, { status: 400 })
+    }
 
     const domain = process.env.AUTH_DOMAIN
     const origin = process.env.NEXT_PUBLIC_APP_URL
@@ -38,9 +31,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Bind session to address
     const address = siwe.address
     const res = NextResponse.json({ ok: true, address })
-    res.cookies.set('siwe_session', JSON.stringify({ address }), baseCookieOptions({ maxAge: 60 * 60 * 24 * 7 }))
+    res.cookies.set('siwe_session', JSON.stringify({ address }), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: true,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    })
     // Clear nonce after use
-    res.cookies.set('siwe_nonce', '', baseCookieOptions({ maxAge: 0 }))
+    res.cookies.set('siwe_nonce', '', { httpOnly: true, sameSite: 'lax', secure: true, path: '/', maxAge: 0 })
     return res
   } catch (e) {
     console.error('SIWE verify error', e)

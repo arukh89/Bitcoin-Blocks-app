@@ -7,8 +7,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'pbs.twimg.com' },
       { protocol: 'https', hostname: 'blob.vercel-storage.com' },
       { protocol: 'https', hostname: 'public.blob.vercel-storage.com' },
-      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' }
-    ]
+      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' },
+    ],
   },
   webpack: (config) => {
     config.resolve = config.resolve || {}
@@ -44,6 +44,7 @@ const nextConfig = {
       `connect-src ${connectSrc}`,
       "frame-ancestors 'self' https://warpcast.com https://*.warpcast.com https://farcaster.xyz https://*.farcaster.xyz",
     ].join('; ')
+
     return [
       {
         source: '/:path*',

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from "react"
 import { WagmiProvider, createConfig } from "wagmi"
 import { farcasterMiniApp as miniAppConnector } from "@farcaster/miniapp-wagmi-connector"
-import { base, baseSepolia, arbitrum } from "viem/chains"
+import { base, baseSepolia } from "viem/chains"
 import { http } from "viem"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useAccount, useConnect } from "wagmi"
@@ -12,16 +12,14 @@ import { injected } from "wagmi/connectors"
 // Export a singleton QueryClient to avoid duplicate caches
 const queryClient = new QueryClient()
 
-// Chain configuration (exported for reference if needed)
-export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || base.id)
-export const SELECTED_CHAIN = CHAIN_ID === baseSepolia.id ? baseSepolia : base
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || base.id)
+const SELECTED_CHAIN = CHAIN_ID === baseSepolia.id ? baseSepolia : base
 
 export const config = createConfig({
-  chains: [base, baseSepolia, arbitrum],
+  chains: [SELECTED_CHAIN],
   transports: {
     [base.id]: http(),
     [baseSepolia.id]: http(),
-    [arbitrum.id]: http(),
   },
   connectors: [miniAppConnector(), injected()],
   ssr: true,

@@ -3,13 +3,19 @@ import 'client-only'
 import type { DbConnection as DbConnType, ErrorContext } from '@/spacetime_module_bindings'
 import type { Identity } from 'spacetimedb'
 
-// SpacetimeDB connection settings — defer validation to runtime to avoid crashing UI at import time
-// IMPORTANT: Module must be published to SpacetimeDB Maincloud using official SDK
+// SpacetimeDB connection settings
+// IMPORTANT: Module must be published to SpacetimeDB Maincloud using CLI
 // Using Maincloud (production-ready database)
 // Instructions: See DEPLOYMENT_GUIDE.md
-
 const SPACETIME_HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST
 const SPACETIME_DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME
+
+if (!SPACETIME_HOST) {
+  throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_HOST')
+}
+if (!SPACETIME_DB_NAME) {
+  throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_DB_NAME')
+}
 
 function normalizeWsHost(input: string): string {
   let h = input.trim()
@@ -28,45 +34,15 @@ function normalizeWsHost(input: string): string {
   return h
 }
 
-// Defer env validation to runtime to avoid build-time crashes
+// Narrow to string after runtime guards
+const HOST = normalizeWsHost(SPACETIME_HOST as string)
+const DB_NAME = SPACETIME_DB_NAME as string
 
 let dbConnection: DbConnType | null = null
+let isConnecting = false
 let connectionError: string | null = null
-const connectionPromises = new Map<string, Promise<DbConnType>>()
-const MAX_RETRIES = 3
 let retryCount = 0
-
-async function createConnection(opts: { HOST: string; DB_NAME: string; onConnect?: () => void; onDisconnect?: () => void; }): Promise<DbConnType> {
-  const { HOST, DB_NAME, onConnect, onDisconnect } = opts
-
-  // Set timeout for connection
-  const connectionTimeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Connection timeout after 10 seconds')), 10000)
-  })
-
-  const { DbConnection } = await import('@/spacetime_module_bindings')
-  const connectionPromise = DbConnection.builder()
-    .withUri(HOST)
-    .withModuleName(DB_NAME)
-    .onConnect((_connection: DbConnType, identity: Identity, _token: string) => {
-      console.log('✅ Connected to SpacetimeDB')
-      console.log('Identity:', identity)
-      retryCount = 0
-      connectionError = null
-      try { onConnect?.() } catch (e) { console.warn('onConnect callback error', e) }
-    })
-    .onDisconnect((_ctx: ErrorContext, _error?: Error) => {
-      console.log('❌ Disconnected from SpacetimeDB')
-      dbConnection = null
-      try { onDisconnect?.() } catch (e) { console.warn('onDisconnect callback error', e) }
-    })
-    .build()
-
-  const conn = await Promise.race([connectionPromise, connectionTimeout])
-  dbConnection = conn
-  console.log('🎉 SpacetimeDB connection established!', { host: HOST, database: DB_NAME })
-  return conn
-}
+const MAX_RETRIES = 3
 
 export async function connectToSpacetime(opts?: {
   onConnect?: () => void
@@ -75,34 +51,62 @@ export async function connectToSpacetime(opts?: {
   if (typeof window === 'undefined') {
     throw new Error('Spacetime client can only run in the browser')
   }
-  // Resolve env at call time (avoid crashing at import/build time)
-  const hostRaw = SPACETIME_HOST
-  const dbNameRaw = SPACETIME_DB_NAME
-  if (!hostRaw) {
-    throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_HOST')
-  }
-  if (!dbNameRaw) {
-    throw new Error('Missing env: NEXT_PUBLIC_SPACETIME_DB_NAME')
-  }
-  const HOST = normalizeWsHost(hostRaw)
-  const DB_NAME = dbNameRaw
   // Return existing connection if available
   if (dbConnection) {
     console.log('♻️ Reusing existing SpacetimeDB connection')
     return dbConnection
   }
 
-  const connectionKey = `${HOST}__${DB_NAME}`
-  if (connectionPromises.has(connectionKey)) {
-    return connectionPromises.get(connectionKey)!
+  // Prevent multiple simultaneous connection attempts
+  if (isConnecting) {
+    console.log('⏳ Connection already in progress, waiting...')
+    // Wait for existing connection attempt
+    while (isConnecting) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    if (dbConnection) return dbConnection
+    if (connectionError) throw new Error(connectionError)
   }
 
-  const promise = createConnection({ HOST, DB_NAME, onConnect: opts?.onConnect, onDisconnect: opts?.onDisconnect })
-  connectionPromises.set(connectionKey, promise)
-
   try {
-    console.log('🔌 Connecting to SpacetimeDB...', { host: HOST, database: DB_NAME, attempt: `${retryCount + 1}/${MAX_RETRIES + 1}` })
-    const conn = await promise
+    isConnecting = true
+    connectionError = null
+    console.log('🔌 Connecting to SpacetimeDB...')
+    console.log('Host:', HOST)
+    console.log('Database:', DB_NAME)
+    console.log(`Attempt ${retryCount + 1}/${MAX_RETRIES + 1}`)
+    
+    // Set timeout for connection
+    const connectionTimeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Connection timeout after 10 seconds')), 10000)
+    })
+
+    const { DbConnection } = await import('@/spacetime_module_bindings')
+    const connectionPromise = DbConnection.builder()
+      .withUri(HOST)
+      .withModuleName(DB_NAME)
+      .onConnect((_connection: DbConnType, identity: Identity, _token: string) => {
+        console.log('✅ Connected to SpacetimeDB')
+        console.log('Identity:', identity)
+        retryCount = 0 // Reset retry count on successful connection
+        connectionError = null
+        try { opts?.onConnect?.() } catch (e) { console.warn('onConnect callback error', e) }
+      })
+      .onDisconnect((_ctx: ErrorContext, _error?: Error) => {
+        console.log('❌ Disconnected from SpacetimeDB')
+        dbConnection = null
+        try { opts?.onDisconnect?.() } catch (e) { console.warn('onDisconnect callback error', e) }
+      })
+      .build()
+    
+    const conn = await Promise.race([connectionPromise, connectionTimeout])
+    
+    dbConnection = conn
+    console.log('🎉 SpacetimeDB connection established!')
+    console.log('📊 Module info:', {
+      host: HOST,
+      database: DB_NAME
+    })
     return conn
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
@@ -145,7 +149,7 @@ export async function connectToSpacetime(opts?: {
     
     throw new Error(`SpacetimeDB connection failed: ${errorMsg}`)
   } finally {
-    connectionPromises.delete(connectionKey)
+    isConnecting = false
   }
 }
 
@@ -158,7 +162,7 @@ export function getConnectionError(): string | null {
 }
 
 export function isConnectionReady(): boolean {
-  return dbConnection !== null
+  return dbConnection !== null && !isConnecting
 }
 
 export type { DbConnType as DbConnection }

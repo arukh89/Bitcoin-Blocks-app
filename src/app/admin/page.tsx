@@ -8,20 +8,17 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { useGame } from '@/context/GameContext'
+import { useGame, isDevAddress } from '@/context/GameContext'
+import type { ChatMessage } from '@/types/game'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { CheckInLeaderboard } from '@/components/CheckInLeaderboard'
-import { announceSystemMessage } from '@/lib/announce'
-import { recentBlocks, blockByHeight, txCountByHash } from '@/lib/mempool-client'
-import { calculateWinners } from '@/lib/winner-utils'
-import { isAdminAddress } from '@/lib/admin'
 // Removed APP_CONFIG - using pure realtime mode
 
 export default function AdminPage() {
   const router = useRouter()
-  const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected, addChatMessage, getBool } = useGame()
+  const { createRound, endRound, updateRoundResult, activeRound, getGuessesForRound, connected, addChatMessage } = useGame()
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<boolean>(false)
@@ -36,7 +33,7 @@ export default function AdminPage() {
 
   // Redirect if not admin
   useEffect(() => {
-    if (user && !isAdminAddress(user.address)) {
+    if (user && !isDevAddress(user.address)) {
       router.push('/')
     }
   }, [user, router])
@@ -51,7 +48,7 @@ export default function AdminPage() {
   }
 
   // Only show to admin addresses
-  if (!isAdminAddress(user.address)) {
+  if (!isDevAddress(user.address)) {
     return <></>
   }
 
@@ -78,15 +75,15 @@ export default function AdminPage() {
     const now = Date.now()
     const endTime = now + (24 * 60 * 60 * 1000)
     const prize = `${jackpotAmount} ${jackpotCurrency}`
-    const nextRoundNumber = activeRound ? Number(activeRound.roundNumber) + 1 : 1
+    const nextRoundNumber = activeRound ? activeRound.roundNumber + 1 : 1
 
     try {
       setLoading(true)
       await createRound(nextRoundNumber, now, endTime, prize, blockNum)
       
-      // Announce to Global Chat (gated by settings)
+      // Announce to Global Chat (FID only)
       const message = `🔔 New Round Started!\n\nGuess how many transactions will be in the next Bitcoin block ⛏️\n\n💰 Jackpot: ${prize}\n🎯 Target Block: #${blockNum}\n\n#BitcoinBlocks`
-      await announceSystemMessage(message, user, { addChatMessage, getBool })
+      await handleAnnounce(message)
       
       toast({
         title: '✅ Round Started',
@@ -162,42 +159,49 @@ export default function AdminPage() {
 
     try {
       setLoading(true)
-      let blockHash = ''
-      let actualTxCount = 0
-
-      // Try recent blocks first
-      try {
-        const blocks = await recentBlocks()
-        const found = blocks.find(b => b.height === activeRound.blockNumber)
-        if (found) {
-          blockHash = found.hash
-          actualTxCount = await txCountByHash(blockHash)
-        }
-      } catch {}
-
-      // Fallback: direct by height
-      if (!blockHash) {
-        const data = await blockByHeight(activeRound.blockNumber!)
-        blockHash = data.blockHash
-        actualTxCount = typeof data.txCount === 'number' ? data.txCount : await txCountByHash(blockHash)
+      
+      // Fetch from internal mempool API
+      const recentRes = await fetch('/api/mempool?action=recent-blocks')
+      if (!recentRes.ok) {
+        throw new Error('Failed to fetch recent blocks')
       }
+      const recentBlocks = await recentRes.json() as Array<{ height: number, hash: string }>
+      const found = recentBlocks.find(b => b.height === activeRound.blockNumber)
+      if (!found) {
+        throw new Error(`Block #${activeRound.blockNumber} not found in recent blocks. Try again later.`)
+      }
+      const blockHash = found.hash
 
-      // Find winners using shared utility
-      const guesses = getGuessesForRound(activeRound.id)
-      if (guesses.length === 0) throw new Error('No predictions in this round')
-      const sorted = calculateWinners(
-        guesses.map(g => ({ address: g.address, username: g.username, guess: BigInt(g.guess), submittedAt: BigInt(g.submittedAt) })),
-        BigInt(actualTxCount)
-      )
-      const winner = sorted[0]
-      const runnerUp = sorted[1]
+      const txRes = await fetch(`/api/mempool?action=tx-count&blockHash=${blockHash}`)
+      if (!txRes.ok) {
+        throw new Error('Failed to fetch transaction count')
+      }
+      const { txCount } = await txRes.json() as { txCount: number }
+      const actualTxCount = txCount
 
-      await updateRoundResult(activeRound.id, actualTxCount, blockHash, winner.address!)
+        // Find winners
+        const guesses = getGuessesForRound(activeRound.id)
+        if (guesses.length === 0) {
+          throw new Error('No predictions in this round')
+        }
 
-      // Announce results to Global Chat
-      const newJackpot = `${jackpotAmount} ${jackpotCurrency}`
-      const message = `📊 Block #${activeRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\n\n🥇 Winner: @${winner.username}\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\n\n💰 Jackpot is now: ${newJackpot}\n\n#BitcoinBlocks`
-      await announceSystemMessage(message, user, { addChatMessage, getBool })
+        const sorted = [...guesses].sort((a, b) => {
+          const diffA = Math.abs(a.guess - actualTxCount)
+          const diffB = Math.abs(b.guess - actualTxCount)
+          if (diffA !== diffB) return diffA - diffB
+          return a.submittedAt - b.submittedAt
+        })
+
+        const winner = sorted[0]
+        const runnerUp = sorted[1]
+
+        await updateRoundResult(activeRound.id, actualTxCount, blockHash, winner.address)
+
+        // Announce results to Global Chat (FID only)
+        const newJackpot = `${jackpotAmount} ${jackpotCurrency}`
+        const message = `📊 Block #${activeRound.blockNumber} had ${actualTxCount.toLocaleString()} transactions.\n\n🥇 Winner: @${winner.username}\n🥈 Runner-Up: ${runnerUp ? `@${runnerUp.username}` : 'N/A'}\n\n💰 Jackpot is now: ${newJackpot}\n\n#BitcoinBlocks`
+        
+        await handleAnnounce(message)
 
       toast({
         title: '🎉 Results Posted!',
@@ -214,7 +218,27 @@ export default function AdminPage() {
     }
   }
 
-  // Announcement handled via announceSystemMessage helper
+  const handleAnnounce = async (message: string): Promise<void> => {
+    if (!user || !isDevAddress(user.address)) return
+    // Only allow FID-based accounts to announce
+    if (!user.address.startsWith('fid-')) return
+
+    try {
+      const chatMsg: ChatMessage = {
+        id: `sys-${Date.now()}`,
+        roundId: 'global',
+        address: user.address,
+        username: user.username,
+        message,
+        pfpUrl: user.pfpUrl,
+        timestamp: Date.now(),
+        type: 'system'
+      }
+      await addChatMessage(chatMsg)
+    } catch (error) {
+      console.error('Announcement error:', error)
+    }
+  }
 
   return (
     <main 
