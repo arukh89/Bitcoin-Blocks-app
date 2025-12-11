@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['spacetimedb'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'api.dicebear.com' },
@@ -23,6 +24,8 @@ const nextConfig = {
     const envHost = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
     const stripped = envHost.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '')
     const wssHost = stripped ? `wss://${stripped}` : ''
+    const wsHost = stripped ? `ws://${stripped}` : ''
+    const isLocal = /^(localhost|127\.0\.0\.1)(:|$)/i.test(stripped)
 
     const connectSrc = [
       "'self'",
@@ -31,6 +34,8 @@ const nextConfig = {
       'https://mempool.space',
       'https://*.mempool.space',
       wssHost,
+      // Allow plain ws for local dev only to match SDK default (ws://127.0.0.1)
+      isLocal ? wsHost : '',
     ]
       .filter(Boolean)
       .join(' ')

@@ -8,10 +8,11 @@ import type { User } from '@/types/game'
 const FIDS_RAW = process.env.NEXT_PUBLIC_ADMIN_FIDS
 const WALLETS_RAW = process.env.NEXT_PUBLIC_ADMIN_WALLETS
 
-if (!FIDS_RAW) throw new Error('Missing env: NEXT_PUBLIC_ADMIN_FIDS')
-if (!WALLETS_RAW) throw new Error('Missing env: NEXT_PUBLIC_ADMIN_WALLETS')
+if (!FIDS_RAW) console.warn('AuthContext: NEXT_PUBLIC_ADMIN_FIDS not set; admin FID list will be empty')
+if (!WALLETS_RAW) console.warn('AuthContext: NEXT_PUBLIC_ADMIN_WALLETS not set; admin wallet list will be empty')
 
-export const ADMIN_FIDS: number[] = FIDS_RAW.split(',')
+export const ADMIN_FIDS: number[] = (FIDS_RAW || '')
+  .split(',')
   .map(s => s.trim())
   .filter(Boolean)
   .map(n => Number(n))
@@ -21,7 +22,8 @@ export function isAdminFid(fid: number): boolean {
   return ADMIN_FIDS.includes(fid)
 }
 
-export const ADMIN_WALLETS: string[] = WALLETS_RAW.split(',')
+export const ADMIN_WALLETS: string[] = (WALLETS_RAW || '')
+  .split(',')
   .map(s => s.trim().toLowerCase())
   .filter(s => /^0x[a-f0-9]{40}$/.test(s))
 

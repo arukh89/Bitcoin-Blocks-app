@@ -41,40 +41,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!pk) {
       return NextResponse.json({ ok: false, error: 'Signer not configured' }, { status: 501 })
     }
-    // --- Server-side validation against SpacetimeDB ---
-    const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
-    const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
-    if (!HOST || !DB_NAME) {
-      return NextResponse.json({ ok: false, error: 'SpacetimeDB not configured' }, { status: 500 })
-    }
-    const wsHost = (() => {
-      let h = HOST.trim()
-      if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
-      if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
-      if (!h.startsWith('ws://') && !h.startsWith('wss://')) h = 'wss://' + h.replace(/^\/+/, '')
-      return h
-    })()
-
-    const conn = await DbConnection.builder()
-      .withUri(wsHost)
-      .withModuleName(DB_NAME)
-      .build()
-
-    // Subscribe to all tables to fetch current state
-    try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
-    // very small delay to allow snapshot
-    await new Promise(r => setTimeout(r, 250))
-
-    const roundIdBn = BigInt(roundId)
-    const roundsIter = Array.from(conn.db.rounds.iter()) as any[]
-    const guessesIter = Array.from(conn.db.guesses.iter()) as any[]
-    const roundRow = roundsIter.find((r: any) => r.roundId === roundIdBn)
-    if (!roundRow) {
-      return NextResponse.json({ ok: false, error: 'Round not found' }, { status: 404 })
-    }
-    // Extract helpers
-    const actualTx = roundRow.actualTxCount ?? undefined
-    const winningFid = roundRow.winningFid ?? undefined
+    // Dev bypass: allow skipping DB validation for local manual testing
+    const devNoDb = (process.env.DEV_NO_DB || '').toLowerCase() === '1' || (process.env.DEV_NO_DB || '').toLowerCase() === 'true'
+    const allowBypass = devNoDb && process.env.NODE_ENV !== 'production'
 
     const fidBn = fid !== undefined && fid !== null
       ? BigInt(typeof fid === 'string' ? fid : String(fid))
@@ -83,33 +52,66 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: 'Missing fid' }, { status: 400 })
     }
 
-    if (rewardType === 'first') {
-      if (!winningFid || winningFid !== fidBn) {
-        return NextResponse.json({ ok: false, error: 'Not authorized: not first-place winner' }, { status: 403 })
+    if (!allowBypass) {
+      // --- Server-side validation against SpacetimeDB ---
+      const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
+      const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
+      if (!HOST || !DB_NAME) {
+        return NextResponse.json({ ok: false, error: 'SpacetimeDB not configured' }, { status: 500 })
       }
-    } else {
-      // Compute local winners from guesses for this round
-      const roundGuesses = guessesIter
-        .filter((g: any) => g.roundId === roundIdBn)
-        .map((g: any) => ({ fid: g.fid as bigint, guess: g.guess as bigint, submittedAt: g.submittedAt as bigint }))
-      if (!actualTx || roundGuesses.length === 0) {
-        return NextResponse.json({ ok: false, error: 'Round results not available' }, { status: 409 })
+      const wsHost = (() => {
+        let h = HOST.trim()
+        if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
+        if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
+        if (!h.startsWith('ws://') && !h.startsWith('wss://')) h = 'wss://' + h.replace(/^\/+/, '')
+        return h
+      })()
+
+      const conn = await DbConnection.builder()
+        .withUri(wsHost)
+        .withModuleName(DB_NAME)
+        .build()
+
+      try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
+      await new Promise(r => setTimeout(r, 250))
+
+      const roundIdBn = BigInt(roundId)
+      const roundsIter = Array.from(conn.db.rounds.iter()) as any[]
+      const guessesIter = Array.from(conn.db.guesses.iter()) as any[]
+      const roundRow = roundsIter.find((r: any) => r.roundId === roundIdBn)
+      if (!roundRow) {
+        return NextResponse.json({ ok: false, error: 'Round not found' }, { status: 404 })
       }
-      const sorted = roundGuesses.sort((a: any, b: any) => {
-        const da = (a.guess > actualTx ? a.guess - actualTx : actualTx - a.guess)
-        const db = (b.guess > actualTx ? b.guess - actualTx : actualTx - b.guess)
-        if (da !== db) return Number(da - db)
-        return Number(a.submittedAt - b.submittedAt)
-      })
-      const first = sorted[0]
-      const second = sorted[1]
-      if (rewardType === 'second') {
-        if (!second || second.fid !== fidBn) {
-          return NextResponse.json({ ok: false, error: 'Not authorized: not second-place winner' }, { status: 403 })
+      const actualTx = roundRow.actualTxCount ?? undefined
+      const winningFid = roundRow.winningFid ?? undefined
+
+      if (rewardType === 'first') {
+        if (!winningFid || winningFid !== fidBn) {
+          return NextResponse.json({ ok: false, error: 'Not authorized: not first-place winner' }, { status: 403 })
         }
-      } else if (rewardType === 'jackpot') {
-        if (!first || first.fid !== fidBn || first.guess !== actualTx) {
-          return NextResponse.json({ ok: false, error: 'Not authorized: not jackpot winner' }, { status: 403 })
+      } else {
+        const roundGuesses = guessesIter
+          .filter((g: any) => g.roundId === roundIdBn)
+          .map((g: any) => ({ fid: g.fid as bigint, guess: g.guess as bigint, submittedAt: g.submittedAt as bigint }))
+        if (!actualTx || roundGuesses.length === 0) {
+          return NextResponse.json({ ok: false, error: 'Round results not available' }, { status: 409 })
+        }
+        const sorted = roundGuesses.sort((a: any, b: any) => {
+          const da = (a.guess > actualTx ? a.guess - actualTx : actualTx - a.guess)
+          const db = (b.guess > actualTx ? b.guess - actualTx : actualTx - b.guess)
+          if (da !== db) return Number(da - db)
+          return Number(a.submittedAt - b.submittedAt)
+        })
+        const first = sorted[0]
+        const second = sorted[1]
+        if (rewardType === 'second') {
+          if (!second || second.fid !== fidBn) {
+            return NextResponse.json({ ok: false, error: 'Not authorized: not second-place winner' }, { status: 403 })
+          }
+        } else if (rewardType === 'jackpot') {
+          if (!first || first.fid !== fidBn || first.guess !== actualTx) {
+            return NextResponse.json({ ok: false, error: 'Not authorized: not jackpot winner' }, { status: 403 })
+          }
         }
       }
     }
@@ -186,13 +188,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ],
     })
 
-    return NextResponse.json({
-      ok: true,
-      signature,
-      claim: message,
-      domain,
-      tx: { to: contractAddress, data, chainId },
-    })
+    const claimJson = {
+      roundId: message.roundId.toString(),
+      fid: message.fid.toString(),
+      recipient: message.recipient,
+      amount: message.amount.toString(),
+      prizeType: message.prizeType,
+      nonce: message.nonce.toString(),
+      expiry: message.expiry.toString(),
+    }
+    return NextResponse.json({ ok: true, signature, claim: claimJson, domain, tx: { to: contractAddress, data, chainId } })
   } catch (e) {
     return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })
   }

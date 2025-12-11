@@ -402,13 +402,11 @@ export function AdminPanel() {
       setLoading(true)
       
       // Convert to BigInt for SpacetimeDB
-      const reducers = (client as any).reducers as any
-      await reducers.savePrizeConfig(
+      client!.reducers.savePrizeConfig(
         BigInt(Math.floor(jackpotNum)),
         BigInt(Math.floor(firstNum)),
         BigInt(Math.floor(secondNum)),
-        prizeCurrency.trim(),
-        user?.address || ''
+        prizeCurrency.trim()
       )
 
       toast({
@@ -499,6 +497,19 @@ export function AdminPanel() {
       setBlockAvailable(true)
       setCheckingBlock(false)
       clearInterval(interval)
+    }
+  }
+
+  const toggleAnnounceRequiresFid = async (nextVal: boolean): Promise<void> => {
+    if (!client || !connected) {
+      toast({ title: '⚠️ Not Connected', description: 'Please wait for database connection', variant: 'destructive' })
+      return
+    }
+    try {
+      ;(client as any).reducers.saveSetting('admin_announce_requires_fid', nextVal ? 'true' : 'false')
+      toast({ title: '✅ Site Setting Saved', description: `Announcements require FID: ${nextVal ? 'ON' : 'OFF'}` })
+    } catch (e) {
+      toast({ title: '❌ Failed', description: e instanceof Error ? e.message : 'Failed to save setting', variant: 'destructive' })
     }
   }
 
@@ -787,6 +798,32 @@ export function AdminPanel() {
                 <p className="text-xs text-blue-300">
                   💡 Save your prize configuration to database. These values will be used when creating new rounds.
                 </p>
+              </div>
+            </div>
+
+            {/* Site Settings */}
+            <div className="glass-card p-6 rounded-2xl space-y-4 border border-cyan-500/30 lg:col-span-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚙️</span>
+                <h3 className="text-base font-bold text-white">Site Settings</h3>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-black/30 border border-gray-600/30">
+                <div>
+                  <div className="text-sm text-gray-200 font-semibold">Announcements require Farcaster (FID)</div>
+                  <div className="text-xs text-gray-400">If OFF, admins can announce using wallet-only login.</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs font-mono ${getBool('admin_announce_requires_fid', true) ? 'text-green-400' : 'text-yellow-300'}`}>
+                    {getBool('admin_announce_requires_fid', true) ? 'ON' : 'OFF'}
+                  </span>
+                  <Input
+                    type="checkbox"
+                    checked={getBool('admin_announce_requires_fid', true)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => toggleAnnounceRequiresFid(e.target.checked)}
+                    className="h-5 w-5"
+                  />
+                </div>
               </div>
             </div>
           </div>
