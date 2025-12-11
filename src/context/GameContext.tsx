@@ -660,7 +660,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const blockNumBigInt = blockNumber !== undefined ? BigInt(blockNumber) : undefined
       
       console.log('📤 [REALTIME] Creating round...', { roundNumber, durationMinutes: durationMinutes.toString(), prize, blockNumber })
-      await (client as any).reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt, (user?.address || ''))
+      client!.reducers.createRound(roundNumBigInt, durationMinutes, prize, blockNumBigInt)
       console.log('✅ [REALTIME] Round created successfully!')
     } catch (error) {
       console.error('❌ [REALTIME] Failed to create round:', error)
@@ -739,7 +739,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await (client as any).reducers.endRoundManually(BigInt(roundId), (user?.address || ''))
+      client!.reducers.endRoundManually(BigInt(roundId))
       console.log('✅ [REALTIME] Round ended!')
       return true
     } catch (error) {

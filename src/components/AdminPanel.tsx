@@ -402,13 +402,11 @@ export function AdminPanel() {
       setLoading(true)
       
       // Convert to BigInt for SpacetimeDB
-      const reducers = (client as any).reducers as any
-      await reducers.savePrizeConfig(
+      client!.reducers.savePrizeConfig(
         BigInt(Math.floor(jackpotNum)),
         BigInt(Math.floor(firstNum)),
         BigInt(Math.floor(secondNum)),
-        prizeCurrency.trim(),
-        user?.address || ''
+        prizeCurrency.trim()
       )
 
       toast({
