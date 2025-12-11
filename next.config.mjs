@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['spacetimedb'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'api.dicebear.com' },

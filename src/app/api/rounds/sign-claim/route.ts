@@ -163,6 +163,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ ok: true, signature, claim: message, domain, tx: { to: contractAddress, data, chainId } })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })
+    const msg = e instanceof Error ? `${e.name}: ${e.message}` : 'Unknown error'
+    return NextResponse.json({ ok: false, error: 'Internal error', detail: msg }, { status: 500 })
   }
 }
