@@ -426,6 +426,34 @@ export function AdminPanel() {
     }
   }
 
+  const setAnnounceRequiresFid = async (value: boolean): Promise<void> => {
+    if (!client || !connected) {
+      toast({
+        title: '⚠️ Not Connected',
+        description: 'Please wait for database connection',
+        variant: 'destructive'
+      })
+      return
+    }
+    try {
+      setLoading(true)
+      const reducers = (client as any).reducers as any
+      await reducers.saveSetting('admin_announce_requires_fid', value ? 'true' : 'false')
+      toast({
+        title: '✅ Site Setting Saved',
+        description: `admin_announce_requires_fid = ${value ? 'true' : 'false'}`
+      })
+    } catch (error) {
+      toast({
+        title: '❌ Failed to Save',
+        description: error instanceof Error ? error.message : 'Failed to save setting',
+        variant: 'destructive'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Poll mempool (via internal API) to check if target block is available
   const pollForTargetBlock = async (targetBlock: number): Promise<void> => {
     setCheckingBlock(true)
@@ -798,7 +826,35 @@ export function AdminPanel() {
             </p>
           </div>
 
-          
+          <div className="glass-card p-6 rounded-2xl space-y-4 border border-yellow-500/30">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">⚙️</span>
+              <h3 className="text-base font-bold text-white">Site Settings</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Button
+                onClick={() => setAnnounceRequiresFid(false)}
+                disabled={loading || !connected}
+                className="bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white font-bold h-12"
+              >
+                Allow wallet-only announcements (set admin_announce_requires_fid = false)
+              </Button>
+              <Button
+                onClick={() => setAnnounceRequiresFid(true)}
+                disabled={loading || !connected}
+                variant="secondary"
+                className="h-12"
+              >
+                Require Farcaster login for announcements (set = true)
+              </Button>
+            </div>
+            {getBool('admin_announce_requires_fid', true) ? (
+              <p className="text-[10px] text-red-400">Current: admin_announce_requires_fid = true (requires FID)</p>
+            ) : (
+              <p className="text-[10px] text-green-400">Current: admin_announce_requires_fid = false (wallet-only allowed)</p>
+            )}
+          </div>
+
         </CardContent>
       </Card>
     </motion.div>
