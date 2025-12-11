@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Ensure TS/ESM inside node_modules/spacetimedb is transpiled by Next.js
+  transpilePackages: ['spacetimedb'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'api.dicebear.com' },
