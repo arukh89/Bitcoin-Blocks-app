@@ -168,7 +168,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ],
     })
 
-    return NextResponse.json({ ok: true, signature, claim: message, domain, tx: { to: contractAddress, data, chainId } })
+    const claimJson = {
+      roundId: message.roundId.toString(),
+      fid: message.fid.toString(),
+      recipient: message.recipient,
+      amount: message.amount.toString(),
+      prizeType: message.prizeType,
+      nonce: message.nonce.toString(),
+      expiry: message.expiry.toString(),
+    }
+    return NextResponse.json({ ok: true, signature, claim: claimJson, domain, tx: { to: contractAddress, data, chainId } })
   } catch (e) {
     const msg = e instanceof Error ? `${e.name}: ${e.message}` : 'Unknown error'
     return NextResponse.json({ ok: false, error: 'Internal error', detail: msg }, { status: 500 })
