@@ -24,18 +24,33 @@ const nextConfig = {
   async headers() {
     const envHost = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
     const stripped = envHost.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '')
-    const wssHost = stripped ? `wss://${stripped}` : ''
+    const explicitHosts = []
+    if (stripped) {
+      // Allow both ws:// and wss:// forms for the configured host
+      explicitHosts.push(`ws://${stripped}`)
+      explicitHosts.push(`wss://${stripped}`)
+    }
 
-    const connectSrc = [
+    const connectSrcArr = [
       "'self'",
       'https://api.farcaster.xyz',
       'https://api.neynar.com',
       'https://mempool.space',
       'https://*.mempool.space',
-      wssHost,
+      ...explicitHosts,
     ]
-      .filter(Boolean)
-      .join(' ')
+
+    // In development, allow all ws/wss (local dev servers)
+    if (process.env.NODE_ENV !== 'production') {
+      connectSrcArr.push('ws:')
+      connectSrcArr.push('wss:')
+      connectSrcArr.push('ws://localhost:*')
+      connectSrcArr.push('wss://localhost:*')
+      connectSrcArr.push('ws://127.0.0.1:*')
+      connectSrcArr.push('wss://127.0.0.1:*')
+    }
+
+    const connectSrc = connectSrcArr.filter(Boolean).join(' ')
 
     const csp = [
       "default-src 'self'",
