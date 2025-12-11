@@ -50,7 +50,7 @@ export function ClaimRewards() {
       // Derive FID from logged in user (AuthContext stores Farcaster id as address = 'fid-<num>')
       const fid = (user?.address && user.address.startsWith('fid-')) ? user.address.slice(4) : undefined
       if (!fid) throw new Error('Missing Farcaster identity (FID)')
-      const res = await fetch("/api/rewards/sign-claim", {
+      const res = await fetch("/api/rounds/sign-claim", {
         method: "POST",
         headers: { "content-type": "application/json" },
         credentials: "include",
@@ -93,7 +93,7 @@ export function ClaimRewards() {
       const amount = prizeConfig ? prizeConfig.secondPlaceAmount : "0"
       const fid = (user?.address && user.address.startsWith('fid-')) ? user.address.slice(4) : undefined
       if (!fid) throw new Error('Missing Farcaster identity (FID)')
-      const res = await fetch("/api/rewards/sign-claim", {
+      const res = await fetch("/api/rounds/sign-claim", {
         method: "POST",
         headers: { "content-type": "application/json" },
         credentials: "include",
@@ -109,8 +109,15 @@ export function ClaimRewards() {
         const j = await res.json().catch(() => ({}))
         throw new Error(j?.error || "Claim signing failed")
       }
-      await res.json()
+      const data = await res.json()
       toast({ title: "Signature ready", description: "Proceeding to onchain claim..." })
+      if (data?.tx?.to && data?.tx?.data) {
+        const params = [{ to: data.tx.to as `0x${string}`, data: data.tx.data as `0x${string}`, value: data.tx.value || "0x0" }]
+        const eth = (globalThis as any).ethereum
+        if (!eth) throw new Error("No wallet provider")
+        await eth.request({ method: "eth_sendTransaction", params })
+        toast({ title: "Claim submitted", description: "Transaction sent" })
+      }
     } catch (e: any) {
       toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
     } finally {
@@ -126,7 +133,7 @@ export function ClaimRewards() {
       const amount = prizeConfig ? prizeConfig.jackpotAmount : "0"
       const fid = (user?.address && user.address.startsWith('fid-')) ? user.address.slice(4) : undefined
       if (!fid) throw new Error('Missing Farcaster identity (FID)')
-      const res = await fetch("/api/rewards/sign-claim", {
+      const res = await fetch("/api/rounds/sign-claim", {
         method: "POST",
         headers: { "content-type": "application/json" },
         credentials: "include",
@@ -142,8 +149,15 @@ export function ClaimRewards() {
         const j = await res.json().catch(() => ({}))
         throw new Error(j?.error || "Claim signing failed")
       }
-      await res.json()
+      const data = await res.json()
       toast({ title: "Signature ready", description: "Proceeding to onchain claim..." })
+      if (data?.tx?.to && data?.tx?.data) {
+        const params = [{ to: data.tx.to as `0x${string}`, data: data.tx.data as `0x${string}`, value: data.tx.value || "0x0" }]
+        const eth = (globalThis as any).ethereum
+        if (!eth) throw new Error("No wallet provider")
+        await eth.request({ method: "eth_sendTransaction", params })
+        toast({ title: "Claim submitted", description: "Transaction sent" })
+      }
     } catch (e: any) {
       toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
     } finally {
