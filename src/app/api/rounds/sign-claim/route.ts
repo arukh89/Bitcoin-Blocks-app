@@ -38,7 +38,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: 'Signer not configured' }, { status: 501 })
     }
 
-    // Validate against SpacetimeDB
+    // Parse and require FID
+    const fidBn = fid !== undefined && fid !== null ? BigInt(typeof fid === 'string' ? fid : String(fid)) : 0n
+    if (fidBn === 0n) {
+      return NextResponse.json({ ok: false, error: 'Missing fid' }, { status: 400 })
+    }
+
+    // Dev bypass: allow skipping DB validation for local manual testing
+    const devNoDb = (process.env.DEV_NO_DB || '').toLowerCase() === '1' || (process.env.DEV_NO_DB || '').toLowerCase() === 'true'
+    const allowBypass = devNoDb && process.env.NODE_ENV !== 'production'
+
+    if (!allowBypass) {
+      // Validate against SpacetimeDB
     const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
     const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
     if (!HOST || !DB_NAME) {
@@ -66,11 +77,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const actualTx = roundRow.actualTxCount ?? undefined
     const winningFid = roundRow.winningFid ?? undefined
-
-    const fidBn = fid !== undefined && fid !== null ? BigInt(typeof fid === 'string' ? fid : String(fid)) : 0n
-    if (fidBn === 0n) {
-      return NextResponse.json({ ok: false, error: 'Missing fid' }, { status: 400 })
-    }
 
     if (rewardType === 'first') {
       if (!winningFid || winningFid !== fidBn) {
@@ -100,6 +106,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           return NextResponse.json({ ok: false, error: 'Not authorized: not jackpot winner' }, { status: 403 })
         }
       }
+    }
     }
 
     const prizeType: number = rewardType === 'first' ? 1 : rewardType === 'second' ? 2 : 3

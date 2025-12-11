@@ -46,32 +46,38 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: 'Missing fid' }, { status: 400 })
     }
 
-    // Validate eligibility from SpacetimeDB
-    const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
-    const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
-    if (!HOST || !DB_NAME) {
-      return NextResponse.json({ ok: false, error: 'SpacetimeDB not configured' }, { status: 500 })
+    // Dev bypass: allow skipping DB validation for local manual testing
+    const devNoDb = (process.env.DEV_NO_DB || '').toLowerCase() === '1' || (process.env.DEV_NO_DB || '').toLowerCase() === 'true'
+    const allowBypass = devNoDb && process.env.NODE_ENV !== 'production'
+
+    let eligible = true
+    let epochDay = dayId !== undefined && dayId !== null ? BigInt(typeof dayId === 'string' ? dayId : String(dayId)) : getTodayDayId()
+    if (!allowBypass) {
+      // Validate eligibility from SpacetimeDB
+      const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
+      const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
+      if (!HOST || !DB_NAME) {
+        return NextResponse.json({ ok: false, error: 'SpacetimeDB not configured' }, { status: 500 })
+      }
+      const wsHost = (() => {
+        let h = HOST.trim()
+        if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
+        if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
+        if (!h.startsWith('ws://') && !h.startsWith('wss://')) h = 'wss://' + h.replace(/^\/+/, '')
+        return h
+      })()
+
+      const conn = await DbConnection.builder().withUri(wsHost).withModuleName(DB_NAME).build()
+      try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
+      await new Promise(r => setTimeout(r, 250))
+
+      const userIdentifier = `fid-${fidBn.toString()}`
+      const checkins = Array.from(conn.db.checkins.iter()) as any[]
+      eligible = checkins.some((c: any) => {
+        const cDay = BigInt(Math.floor(Number(c.checkinDate) / 86400))
+        return c.userIdentifier === userIdentifier && cDay === epochDay
+      })
     }
-    const wsHost = (() => {
-      let h = HOST.trim()
-      if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
-      if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
-      if (!h.startsWith('ws://') && !h.startsWith('wss://')) h = 'wss://' + h.replace(/^\/+/, '')
-      return h
-    })()
-
-    const conn = await DbConnection.builder().withUri(wsHost).withModuleName(DB_NAME).build()
-    try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
-    await new Promise(r => setTimeout(r, 250))
-
-    const epochDay = dayId !== undefined && dayId !== null ? BigInt(typeof dayId === 'string' ? dayId : String(dayId)) : getTodayDayId()
-    const userIdentifier = `fid-${fidBn.toString()}`
-
-    const checkins = Array.from(conn.db.checkins.iter()) as any[]
-    const eligible = checkins.some((c: any) => {
-      const cDay = BigInt(Math.floor(Number(c.checkinDate) / 86400))
-      return c.userIdentifier === userIdentifier && cDay === epochDay
-    })
 
     if (!eligible) {
       return NextResponse.json({ ok: false, error: 'Not eligible for today\'s check-in' }, { status: 403 })
