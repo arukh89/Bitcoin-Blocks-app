@@ -23,6 +23,6 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
  
-# Spacetime server build artifacts
-spacetime-server/target
-spacetime-server/Cargo.lock
+# IDE / Editor
+.vscode/
+.kiro/
