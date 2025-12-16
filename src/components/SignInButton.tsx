@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
@@ -10,89 +10,102 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { base, arbitrum } from 'wagmi/chains'
 import { motion } from 'framer-motion'
 
 export function SignInButton() {
-  const { user, authMode, isInFarcaster, signInWithNeynar, signInWithWallet, signOut, walletChain, setWalletChain } = useAuth()
+  const { user, isInFarcaster, signOut, signInWithWallet } = useAuth()
   const [showDialog, setShowDialog] = useState<boolean>(false)
   const [neynarUrl, setNeynarUrl] = useState<string>('')
-  const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
   const { toast } = useToast()
-  
-  // Wagmi hooks for wallet connection
+  const hasAutoResolved = useRef<string | null>(null)
+
+  // Wagmi hooks
   const { address, isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
+  const { connect, connectors, isPending } = useConnect()
   const { disconnect } = useDisconnect()
 
-  // DISABLED: Auto sign in when wallet connects
-  // Users must manually click Sign In button
-  // This prevents unwanted wallet popups on page load
+  // Auto-resolve wallet to Farcaster user when connected
+  useEffect(() => {
+    const autoResolve = async () => {
+      // Only auto-resolve if:
+      // 1. Wallet is connected
+      // 2. We have an address
+      // 3. User is not already authenticated
+      // 4. We haven't already resolved this address
+      if (isConnected && address && !user && hasAutoResolved.current !== address) {
+        console.log('🔄 Auto-resolving wallet to Farcaster:', address)
+        hasAutoResolved.current = address
+        try {
+          await signInWithWallet(address)
+          setShowDialog(false)
+        } catch (error) {
+          console.error('Auto-resolve failed:', error)
+        }
+      }
+    }
+    autoResolve()
+  }, [isConnected, address, user, signInWithWallet])
+
+  // Find preferred connectors
+  const preferred = useMemo(() => {
+    const far = connectors.find((c) => /farcaster/i.test(c.name) || /mini.?app/i.test(c.name) || /warp/i.test(c.name))
+    const inj = connectors.find((c) => /injected/i.test(c.id) || /metamask/i.test(c.id))
+    const cbw = connectors.find((c) => /coinbase/i.test(c.id))
+    return { far, inj, cbw }
+  }, [connectors])
 
   const handleNeynarSignIn = async (): Promise<void> => {
-    try {
-      const clientId = process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID
-      if (!clientId) {
-        toast({
-          title: 'Missing Neynar Client ID',
-          description: 'Set NEXT_PUBLIC_NEYNAR_CLIENT_ID in your environment to enable Farcaster login.',
-          variant: 'destructive'
-        })
-        return
-      }
-      // Generate Neynar auth URL
-      const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin)}`
-      setNeynarUrl(authUrl)
-      
-      // Open in new window for OAuth flow
-      window.open(authUrl, '_blank', 'width=500,height=700')
-      
-      await signInWithNeynar()
-    } catch (error) {
-      console.error('Neynar sign in failed:', error)
+    const clientId = process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID
+    if (!clientId) {
+      toast({
+        title: 'Missing Neynar Client ID',
+        description: 'Configure NEXT_PUBLIC_NEYNAR_CLIENT_ID to enable Farcaster login.',
+        variant: 'destructive'
+      })
+      return
     }
+    const authUrl = `https://app.neynar.com/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(window.location.origin)}`
+    setNeynarUrl(authUrl)
+    window.open(authUrl, '_blank', 'width=500,height=700')
   }
 
-  const handleWalletConnect = (connectorId: string): void => {
-    const connector = connectors.find((c) => c.id === connectorId)
-    if (connector) {
-      setWalletChain(selectedChain)
-      connect({ connector, chainId: selectedChain === 'base' ? base.id : arbitrum.id })
-      setShowDialog(false)
+  const handleWalletConnect = async (connector: any): Promise<void> => {
+    try {
+      // Connect wallet - the useEffect above will auto-resolve to Farcaster
+      connect({ connector })
+      // Dialog will close automatically when user is set via useEffect
+    } catch (error) {
+      console.error('Wallet connect failed:', error)
+      toast({
+        title: 'Connection Failed',
+        description: 'Could not connect wallet',
+        variant: 'destructive'
+      })
     }
   }
 
   const handleSignOut = (): void => {
-    // Just sign out from app state, don't disconnect wallet
-    // This prevents wallet popup on signout
+    // Reset auto-resolve tracker so user can re-login
+    hasAutoResolved.current = null
     signOut()
+    if (isConnected) {
+      disconnect()
+    }
     setShowDialog(false)
   }
 
-  // If in Farcaster context and already authenticated
-  if (isInFarcaster && authMode === 'farcaster-sdk') {
-    return (
-      <Button onClick={handleSignOut} variant="outline" className="glass-card text-white border-purple-500/50 hover:bg-purple-500/20">
-        <div className="flex items-center gap-2">
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={user?.pfpUrl} alt={user?.username || 'user'} />
-            <AvatarFallback>{user?.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-          </Avatar>
-          <span>{user?.username}</span>
-          <span className="opacity-60">• Sign Out</span>
-        </div>
-      </Button>
-    )
-  }
-
-  // If authenticated via other methods
+  // If authenticated (Farcaster SDK or resolved from wallet)
   if (user) {
     return (
-      <Button onClick={handleSignOut} variant="outline" className="glass-card text-white border-green-500/50 hover:bg-green-500/20">
+      <Button 
+        onClick={handleSignOut} 
+        variant="outline" 
+        className="glass-card text-white border-green-500/50 hover:bg-green-500/20"
+      >
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
             <AvatarImage src={user.pfpUrl} alt={user.username} />
-            <AvatarFallback>{user.username[0]?.toUpperCase() || 'U'}</AvatarFallback>
+            <AvatarFallback>{user.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
           </Avatar>
           <span>{user.username}</span>
           <span className="opacity-60">• Sign Out</span>
@@ -120,27 +133,27 @@ export function SignInButton() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Auth options (shown when not authenticated) */}
-          <Tabs defaultValue="neynar" className="w-full">
-              <TabsList className={`grid w-full ${!isInFarcaster ? 'grid-cols-2' : 'grid-cols-1'} bg-gray-800`}>
+          <Tabs defaultValue={isInFarcaster ? 'wallet' : 'neynar'} className="w-full">
+            <TabsList className={`grid w-full ${!isInFarcaster ? 'grid-cols-2' : 'grid-cols-1'} bg-gray-800`}>
+              {!isInFarcaster && (
                 <TabsTrigger value="neynar" className="text-white">
                   🟣 Farcaster
                 </TabsTrigger>
-                {!isInFarcaster && (
-                  <TabsTrigger value="wallet" className="text-white">
-                    💰 Wallet
-                  </TabsTrigger>
-                )}
-              </TabsList>
+              )}
+              <TabsTrigger value="wallet" className="text-white">
+                💰 Wallet
+              </TabsTrigger>
+            </TabsList>
 
-              {/* Neynar Tab */}
+            {/* Neynar Tab - Only show outside Farcaster */}
+            {!isInFarcaster && (
               <TabsContent value="neynar" className="space-y-4">
                 <Card className="glass-card-dark border-purple-500/30">
                   <CardContent className="pt-6 space-y-4">
                     <div className="text-center">
                       <p className="text-lg font-bold mb-2">Sign in with Farcaster</p>
                       <p className="text-sm text-gray-400 mb-4">
-                        Scan QR code with your Farcaster app
+                        Scan QR code with Warpcast
                       </p>
                     </div>
 
@@ -150,86 +163,90 @@ export function SignInButton() {
                         animate={{ scale: 1, opacity: 1 }}
                         className="flex justify-center p-4 bg-white rounded-xl"
                       >
-                        <QRCodeSVG 
-                          value={neynarUrl} 
-                          size={200}
-                          level="H"
-                          includeMargin
-                        />
+                        <QRCodeSVG value={neynarUrl} size={200} level="H" includeMargin />
                       </motion.div>
                     ) : (
                       <Button
                         onClick={handleNeynarSignIn}
-                        disabled={!process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID}
-                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-purple-600 hover:bg-purple-700"
                       >
-                        {process.env.NEXT_PUBLIC_NEYNAR_CLIENT_ID ? 'Generate QR Code' : 'Configure Neynar Client ID'}
+                        Generate QR Code
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+
+            {/* Wallet Tab */}
+            <TabsContent value="wallet" className="space-y-4">
+              <Card className="glass-card-dark border-blue-500/30">
+                <CardContent className="pt-6 space-y-4">
+                  <div className="text-center mb-4">
+                    <p className="text-lg font-bold mb-2">Connect Wallet</p>
+                    <p className="text-sm text-gray-400">
+                      {isInFarcaster ? 'Use your connected wallet' : 'Connect with MetaMask or Coinbase'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {/* Farcaster connector (in mini app) */}
+                    {preferred.far && (
+                      <Button
+                        onClick={() => handleWalletConnect(preferred.far)}
+                        disabled={isPending}
+                        variant="outline"
+                        className="w-full border-purple-500/50 hover:bg-purple-500/20"
+                      >
+                        🟣 Farcaster Wallet
                       </Button>
                     )}
 
-                    <div className="text-xs text-gray-500 text-center">
-                      Perfect for desktop browsers
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                    {/* Coinbase Wallet */}
+                    {preferred.cbw && (
+                      <Button
+                        onClick={() => handleWalletConnect(preferred.cbw)}
+                        disabled={isPending}
+                        variant="outline"
+                        className="w-full border-blue-500/50 hover:bg-blue-500/20"
+                      >
+                        🔵 Coinbase Wallet
+                      </Button>
+                    )}
 
-              {/* Wallet Tab */}
-              {!isInFarcaster && (
-              <TabsContent value="wallet" className="space-y-4">
-                <Card className="glass-card-dark border-blue-500/30">
-                  <CardContent className="pt-6 space-y-4">
-                    <div className="text-center mb-4">
-                      <p className="text-lg font-bold mb-2">Connect Wallet</p>
-                      <p className="text-sm text-gray-400">
-                        Onchain authentication
-                      </p>
-                    </div>
+                    {/* Injected (MetaMask) */}
+                    {preferred.inj && (
+                      <Button
+                        onClick={() => handleWalletConnect(preferred.inj)}
+                        disabled={isPending}
+                        variant="outline"
+                        className="w-full border-orange-500/50 hover:bg-orange-500/20"
+                      >
+                        🦊 MetaMask / Browser Wallet
+                      </Button>
+                    )}
 
-                    {/* Chain Selector */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Select Network</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          onClick={() => setSelectedChain('base')}
-                          variant={selectedChain === 'base' ? 'default' : 'outline'}
-                          className={selectedChain === 'base' ? 'bg-blue-600' : 'border-gray-700'}
-                        >
-                          🔵 Base
-                        </Button>
-                        <Button
-                          onClick={() => setSelectedChain('arbitrum')}
-                          variant={selectedChain === 'arbitrum' ? 'default' : 'outline'}
-                          className={selectedChain === 'arbitrum' ? 'bg-blue-600' : 'border-gray-700'}
-                        >
-                          🔵 Arbitrum
-                        </Button>
-                      </div>
-                    </div>
+                    {/* Fallback: show all connectors */}
+                    {!preferred.far && !preferred.cbw && !preferred.inj && connectors.map((connector) => (
+                      <Button
+                        key={connector.id}
+                        onClick={() => handleWalletConnect(connector)}
+                        disabled={isPending}
+                        variant="outline"
+                        className="w-full border-gray-700 hover:bg-gray-800"
+                      >
+                        {connector.name}
+                      </Button>
+                    ))}
+                  </div>
 
-                    {/* Wallet Connectors */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Choose Wallet</label>
-                      {connectors.map((connector) => (
-                        <Button
-                          key={connector.id}
-                          onClick={() => handleWalletConnect(connector.id)}
-                          variant="outline"
-                          className="w-full border-gray-700 hover:bg-gray-800"
-                        >
-                          {connector.name}
-                        </Button>
-                      ))}
-                    </div>
-
-                    <div className="text-xs text-gray-500 text-center">
-                      Supports Base & Arbitrum networks
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              )}
-            </Tabs>
+                  <div className="text-xs text-gray-500 text-center">
+                    Your wallet will be linked to your Farcaster account if available
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </>
