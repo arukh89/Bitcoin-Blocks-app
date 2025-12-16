@@ -16,6 +16,7 @@ import { CurrentRound } from '@/components/CurrentRound'
 import PrizesAndRulesSection from '@/components/PrizesAndRulesSection'
 import { DailyCheckIn } from '@/components/DailyCheckIn'
 import { CheckInLeaderboard } from '@/components/CheckInLeaderboard'
+import { ClaimRewards } from '@/components/ClaimRewards'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -255,6 +256,15 @@ export default function Home() {
               transition={{ delay: 0.75 }}
             >
               <AllPredictions />
+            </motion.div>
+
+            {/* Claim Rewards Section */}
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.755 }}
+            >
+              <ClaimRewards />
             </motion.div>
 
             {/* Check-In Section - Two Column Grid */}
