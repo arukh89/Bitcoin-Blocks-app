@@ -401,13 +401,17 @@ export function AdminPanel() {
     try {
       setLoading(true)
       
-      // Convert to BigInt for SpacetimeDB
-      client!.reducers.savePrizeConfig(
-        BigInt(Math.floor(jackpotNum)),
-        BigInt(Math.floor(firstNum)),
-        BigInt(Math.floor(secondNum)),
-        prizeCurrency.trim()
-      )
+      // Save to Supabase
+      const { error } = await client!.from('prize_config').upsert({
+        id: 1,
+        jackpot_amount: Math.floor(jackpotNum),
+        first_place_amount: Math.floor(firstNum),
+        second_place_amount: Math.floor(secondNum),
+        currency_type: prizeCurrency.trim(),
+        updated_at: new Date().toISOString()
+      })
+
+      if (error) throw error
 
       toast({
         title: '✅ Prize Config Saved',
@@ -506,7 +510,12 @@ export function AdminPanel() {
       return
     }
     try {
-      ;(client as any).reducers.saveSetting('admin_announce_requires_fid', nextVal ? 'true' : 'false')
+      const { error } = await client!.from('settings').upsert({
+        key: 'admin_announce_requires_fid',
+        value: nextVal ? 'true' : 'false',
+        updated_at: new Date().toISOString()
+      })
+      if (error) throw error
       toast({ title: '✅ Site Setting Saved', description: `Announcements require FID: ${nextVal ? 'ON' : 'OFF'}` })
     } catch (e) {
       toast({ title: '❌ Failed', description: e instanceof Error ? e.message : 'Failed to save setting', variant: 'destructive' })

@@ -2,16 +2,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isAddress, encodeFunctionData, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { RewardClaimerAbi } from '@/lib/abis/rewardClaimer'
-import { DbConnection } from '@/spacetime_module_bindings'
+import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type Body = {
   recipient: string
-  amount: string // expected in smallest units
+  amount: string
   fid?: string | number
-  dayId?: string | number // optional override; defaults to today (UTC) epoch day
+  dayId?: string | number
 }
 
 function getTodayDayId(): bigint {
@@ -41,50 +41,48 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: 'Signer not configured' }, { status: 501 })
     }
 
-    const fidBn = fid !== undefined && fid !== null ? BigInt(typeof fid === 'string' ? fid : String(fid)) : 0n
-    if (fidBn === 0n) {
+    const fidNum = fid !== undefined && fid !== null ? Number(fid) : 0
+    if (fidNum === 0) {
       return NextResponse.json({ ok: false, error: 'Missing fid' }, { status: 400 })
     }
 
-    // Dev bypass: allow skipping DB validation for local manual testing
     const devNoDb = (process.env.DEV_NO_DB || '').toLowerCase() === '1' || (process.env.DEV_NO_DB || '').toLowerCase() === 'true'
     const allowBypass = devNoDb && process.env.NODE_ENV !== 'production'
 
     let eligible = true
-    let epochDay = dayId !== undefined && dayId !== null ? BigInt(typeof dayId === 'string' ? dayId : String(dayId)) : getTodayDayId()
+    let epochDay = dayId !== undefined && dayId !== null ? BigInt(dayId) : getTodayDayId()
+
     if (!allowBypass) {
-      // Validate eligibility from SpacetimeDB
-      const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
-      const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
-      if (!HOST || !DB_NAME) {
-        return NextResponse.json({ ok: false, error: 'SpacetimeDB not configured' }, { status: 500 })
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!supabaseUrl || !supabaseKey) {
+        return NextResponse.json({ ok: false, error: 'Supabase not configured' }, { status: 500 })
       }
-      const wsHost = (() => {
-        let h = HOST.trim()
-        if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
-        if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
-        if (!h.startsWith('ws://') && !h.startsWith('wss://')) h = 'wss://' + h.replace(/^\/+/, '')
-        return h
-      })()
 
-      const conn = await DbConnection.builder().withUri(wsHost).withModuleName(DB_NAME).build()
-      try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
-      await new Promise(r => setTimeout(r, 250))
+      const supabase = createClient(supabaseUrl, supabaseKey)
+      const userIdentifier = `fid-${fidNum}`
+      
+      // Check if user has checked in today
+      const todayStart = new Date()
+      todayStart.setUTCHours(0, 0, 0, 0)
+      
+      const { data: checkins } = await supabase
+        .from('checkins')
+        .select('id')
+        .eq('user_identifier', userIdentifier)
+        .gte('checkin_date', todayStart.toISOString())
+        .limit(1)
 
-      const userIdentifier = `fid-${fidBn.toString()}`
-      const checkins = Array.from(conn.db.checkins.iter()) as any[]
-      eligible = checkins.some((c: any) => {
-        const cDay = BigInt(Math.floor(Number(c.checkinDate) / 86400))
-        return c.userIdentifier === userIdentifier && cDay === epochDay
-      })
+      eligible = checkins && checkins.length > 0
     }
 
     if (!eligible) {
       return NextResponse.json({ ok: false, error: 'Not eligible for today\'s check-in' }, { status: 403 })
     }
 
-    const prizeType = 4 // dedicated prize type for check-in
+    const prizeType = 4 // check-in prize type
     const amountBn = BigInt(amount)
+    const fidBn = BigInt(fidNum)
 
     const now = Math.floor(Date.now() / 1000)
     const expiry = BigInt(now + 60 * 60)
@@ -99,7 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const types = {
       Claim: [
-        { name: 'roundId', type: 'uint256' }, // reuse as dayId
+        { name: 'roundId', type: 'uint256' },
         { name: 'fid', type: 'uint256' },
         { name: 'recipient', type: 'address' },
         { name: 'amount', type: 'uint256' },
@@ -146,8 +144,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       nonce: message.nonce.toString(),
       expiry: message.expiry.toString(),
     }
+
     return NextResponse.json({ ok: true, signature, claim: claimJson, domain, tx: { to: contractAddress, data, chainId } })
   } catch (e) {
+    console.error('checkin sign-claim error:', e)
     return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })
   }
 }

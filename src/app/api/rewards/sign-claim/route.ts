@@ -1,12 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import {
-  isAddress,
-  encodeFunctionData,
-  type Hex,
-} from 'viem'
+import { isAddress, encodeFunctionData, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { RewardClaimerAbi } from '@/lib/abis/rewardClaimer'
-import { DbConnection } from '@/spacetime_module_bindings'
+import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,100 +37,84 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!pk) {
       return NextResponse.json({ ok: false, error: 'Signer not configured' }, { status: 501 })
     }
-    // Dev bypass: allow skipping DB validation for local manual testing
+
     const devNoDb = (process.env.DEV_NO_DB || '').toLowerCase() === '1' || (process.env.DEV_NO_DB || '').toLowerCase() === 'true'
     const allowBypass = devNoDb && process.env.NODE_ENV !== 'production'
 
-    const fidBn = fid !== undefined && fid !== null
-      ? BigInt(typeof fid === 'string' ? fid : String(fid))
-      : 0n
-    if (fidBn === 0n) {
+    const fidNum = fid !== undefined && fid !== null ? Number(fid) : 0
+    if (fidNum === 0) {
       return NextResponse.json({ ok: false, error: 'Missing fid' }, { status: 400 })
     }
 
     if (!allowBypass) {
-      // --- Server-side validation against SpacetimeDB ---
-      const HOST = process.env.NEXT_PUBLIC_SPACETIME_HOST || ''
-      const DB_NAME = process.env.NEXT_PUBLIC_SPACETIME_DB_NAME || ''
-      if (!HOST || !DB_NAME) {
-        return NextResponse.json({ ok: false, error: 'SpacetimeDB not configured' }, { status: 500 })
+      // Validate against Supabase
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!supabaseUrl || !supabaseKey) {
+        return NextResponse.json({ ok: false, error: 'Supabase not configured' }, { status: 500 })
       }
-      const wsHost = (() => {
-        let h = HOST.trim()
-        if (h.startsWith('http://')) h = 'ws://' + h.slice('http://'.length)
-        if (h.startsWith('https://')) h = 'wss://' + h.slice('https://'.length)
-        if (!h.startsWith('ws://') && !h.startsWith('wss://')) h = 'wss://' + h.replace(/^\/+/, '')
-        return h
-      })()
 
-      const conn = await DbConnection.builder()
-        .withUri(wsHost)
-        .withModuleName(DB_NAME)
-        .build()
+      const supabase = createClient(supabaseUrl, supabaseKey)
+      const roundIdNum = Number(roundId)
 
-      try { conn.subscriptionBuilder().subscribeToAllTables() } catch {}
-      await new Promise(r => setTimeout(r, 250))
+      const { data: roundRow, error: roundError } = await supabase
+        .from('rounds')
+        .select('*')
+        .eq('id', roundIdNum)
+        .single()
 
-      const roundIdBn = BigInt(roundId)
-      const roundsIter = Array.from(conn.db.rounds.iter()) as any[]
-      const guessesIter = Array.from(conn.db.guesses.iter()) as any[]
-      const roundRow = roundsIter.find((r: any) => r.roundId === roundIdBn)
-      if (!roundRow) {
+      if (roundError || !roundRow) {
         return NextResponse.json({ ok: false, error: 'Round not found' }, { status: 404 })
       }
-      const actualTx = roundRow.actualTxCount ?? undefined
-      const winningFid = roundRow.winningFid ?? undefined
+
+      const actualTx = roundRow.actual_tx_count
+      const winningFid = roundRow.winning_fid
 
       if (rewardType === 'first') {
-        if (!winningFid || winningFid !== fidBn) {
+        if (!winningFid || winningFid !== fidNum) {
           return NextResponse.json({ ok: false, error: 'Not authorized: not first-place winner' }, { status: 403 })
         }
       } else {
-        const roundGuesses = guessesIter
-          .filter((g: any) => g.roundId === roundIdBn)
-          .map((g: any) => ({ fid: g.fid as bigint, guess: g.guess as bigint, submittedAt: g.submittedAt as bigint }))
-        if (!actualTx || roundGuesses.length === 0) {
+        const { data: guesses } = await supabase
+          .from('guesses')
+          .select('*')
+          .eq('round_id', roundIdNum)
+
+        if (!actualTx || !guesses || guesses.length === 0) {
           return NextResponse.json({ ok: false, error: 'Round results not available' }, { status: 409 })
         }
-        const sorted = roundGuesses.sort((a: any, b: any) => {
-          const da = (a.guess > actualTx ? a.guess - actualTx : actualTx - a.guess)
-          const db = (b.guess > actualTx ? b.guess - actualTx : actualTx - b.guess)
-          if (da !== db) return Number(da - db)
-          return Number(a.submittedAt - b.submittedAt)
+
+        const sorted = guesses.sort((a, b) => {
+          const da = Math.abs(a.guess - actualTx)
+          const db = Math.abs(b.guess - actualTx)
+          if (da !== db) return da - db
+          return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime()
         })
+
         const first = sorted[0]
         const second = sorted[1]
+
         if (rewardType === 'second') {
-          if (!second || second.fid !== fidBn) {
+          if (!second || second.fid !== fidNum) {
             return NextResponse.json({ ok: false, error: 'Not authorized: not second-place winner' }, { status: 403 })
           }
         } else if (rewardType === 'jackpot') {
-          if (!first || first.fid !== fidBn || first.guess !== actualTx) {
+          if (!first || first.fid !== fidNum || first.guess !== actualTx) {
             return NextResponse.json({ ok: false, error: 'Not authorized: not jackpot winner' }, { status: 403 })
           }
         }
       }
     }
 
-    // no explicit close available in bindings; rely on GC/teardown
-
-    // Map rewardType -> prizeType (uint8)
-    const prizeType: number =
-      rewardType === 'first' ? 1 : rewardType === 'second' ? 2 : 3
-
-    // Parse amount (raw string expected as whole token units in DB UI). If token has 18 decimals, adjust here if desired.
-    // For now assume "amount" provided is already in token smallest units.
+    const prizeType: number = rewardType === 'first' ? 1 : rewardType === 'second' ? 2 : 3
     const amountBn = BigInt(amount)
-    // roundIdBn and fidBn already defined/validated above
+    const roundIdBn = BigInt(roundId)
+    const fidBn = BigInt(fidNum)
 
-    // Nonce & expiry
     const now = Math.floor(Date.now() / 1000)
-    const expiry = BigInt(now + 60 * 60) // +1h
-    // Simple nonce: timestamp millis + random tail
+    const expiry = BigInt(now + 60 * 60)
     const nonce = BigInt(BigInt(Date.now()) ^ BigInt(Math.floor(Math.random() * 1e9)))
 
-    // EIP-712 domain — IMPORTANT: must match contract
-    // Assumed constants used in contract: name "RewardClaimer", version "1"
     const domain = {
       name: 'RewardClaimer',
       version: '1',
@@ -172,7 +152,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       message,
     })
 
-    // Prepare encoded tx for convenience
     const data = encodeFunctionData({
       abi: RewardClaimerAbi,
       functionName: 'claim',
@@ -197,8 +176,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       nonce: message.nonce.toString(),
       expiry: message.expiry.toString(),
     }
+
     return NextResponse.json({ ok: true, signature, claim: claimJson, domain, tx: { to: contractAddress, data, chainId } })
   } catch (e) {
+    console.error('sign-claim error:', e)
     return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })
   }
 }
