@@ -22,19 +22,21 @@ export async function ensureWalletSession(): Promise<string> {
   if (!nonceRes.ok) throw new Error('Failed to get nonce')
   const { nonce } = (await nonceRes.json()) as { nonce: string }
 
-  const domain = process.env.AUTH_DOMAIN || new URL(process.env.NEXT_PUBLIC_APP_URL || window.location.origin).host
-  const uri = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+  // Use window.location for client-side
+  const origin = window.location.origin
+  const domain = new URL(origin).host
   const chainId = getChainId(config)
 
-  // 3) Build SIWE message
+  // 3) Build SIWE message - minimal fields to avoid "max line number" error
+  // SIWE library has strict validation: max 6 lines in message
   const siwe = new SiweMessage({
     domain,
     address,
-    statement: 'Sign in to Bitcoin Blocks',
-    uri,
+    uri: origin,
     version: '1',
     chainId,
     nonce,
+    issuedAt: new Date().toISOString(),
   })
 
   const prepared = siwe.prepareMessage()

@@ -18,6 +18,7 @@ export function SignInButton() {
   const [neynarUrl, setNeynarUrl] = useState<string>('')
   const { toast } = useToast()
   const hasAutoResolved = useRef<string | null>(null)
+  const isResolving = useRef<boolean>(false)
 
   // Wagmi hooks
   const { address, isConnected } = useAccount()
@@ -32,14 +33,20 @@ export function SignInButton() {
       // 2. We have an address
       // 3. User is not already authenticated
       // 4. We haven't already resolved this address
-      if (isConnected && address && !user && hasAutoResolved.current !== address) {
+      // 5. Not currently resolving (prevent race condition)
+      if (isConnected && address && !user && hasAutoResolved.current !== address && !isResolving.current) {
         console.log('🔄 Auto-resolving wallet to Farcaster:', address)
+        isResolving.current = true
         hasAutoResolved.current = address
         try {
           await signInWithWallet(address)
           setShowDialog(false)
         } catch (error) {
           console.error('Auto-resolve failed:', error)
+          // Reset on error so user can retry
+          hasAutoResolved.current = null
+        } finally {
+          isResolving.current = false
         }
       }
     }
