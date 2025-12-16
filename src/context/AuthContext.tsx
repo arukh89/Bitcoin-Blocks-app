@@ -61,49 +61,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [walletChain, setWalletChain] = useState<'base' | 'arbitrum' | null>(null)
 
   // ===========================================
-  // FARCASTER SDK AUTO-LOGIN (Mini App Context)
+  // DETECT FARCASTER CONTEXT (No auto-login)
   // ===========================================
   useEffect(() => {
-    const initFarcaster = async (): Promise<void> => {
+    const detectFarcaster = async (): Promise<void> => {
       try {
-        console.log('🟣 Initializing Farcaster SDK...')
+        console.log('🟣 Checking Farcaster context...')
         await sdk.actions.ready()
         const context = await sdk.context
-        console.log('✅ Farcaster SDK ready:', context)
         
-        setIsInFarcaster(true)
-        
-        // Auto-login with Farcaster user data
-        if (context.user) {
-          const fid = context.user.fid
-          const isAdmin = isAdminFid(fid)
-          
-          console.log('👤 Auto-login with Farcaster user:', {
-            fid,
-            username: context.user.username,
-            isAdmin
-          })
-          
-          const farcasterUser: User = {
-            address: `fid-${fid}`,
-            username: context.user.username || `user${fid}`,
-            displayName: context.user.displayName || context.user.username || 'Anonymous',
-            pfpUrl: context.user.pfpUrl || 'https://i.imgur.com/placeholder.jpg',
-            isAdmin
-          }
-          
-          setUser(farcasterUser)
-          setUserFid(fid)
-          setAuthMode('farcaster-sdk')
-          console.log('✅ Farcaster SDK auto-login successful')
+        if (context) {
+          console.log('✅ Running in Farcaster mini app')
+          setIsInFarcaster(true)
         }
+        // NO AUTO-LOGIN - user must click Sign In button
       } catch (error) {
         console.log('ℹ️ Not in Farcaster context (web mode)')
         setIsInFarcaster(false)
       }
     }
 
-    initFarcaster()
+    detectFarcaster()
   }, [])
 
   // ===========================================
