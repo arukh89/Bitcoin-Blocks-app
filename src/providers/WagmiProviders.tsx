@@ -28,31 +28,9 @@ export const config = createConfig({
   multiInjectedProviderDiscovery: true,
 })
 
+// AutoConnect disabled - let user manually connect via SignInButton
+// This prevents multiple wallet prompts on page load
 function AutoConnect() {
-  const { isConnected } = useAccount()
-  const { connectors, connectAsync } = useConnect()
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      if (isConnected) return
-      try {
-        const sdk = (await import("@farcaster/miniapp-sdk")).default
-        // Ensure we're actually in Farcaster Mini App; will throw on web
-        await sdk.actions.ready()
-        // Prefer injected when available; in mini app, this binds to Farcaster provider + Warplet overlay
-        const injected = connectors.find((c) => c.id === "injected") || connectors[0]
-        if (!injected || cancelled) return
-        await connectAsync({ connector: injected })
-      } catch {
-        // no-op on web if Farcaster SDK not present / not in mini app
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [isConnected, connectors, connectAsync])
-
   return null
 }
 

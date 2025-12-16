@@ -25,9 +25,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: 'Invalid address' }, { status: 400 })
     }
 
-    const isSecond = rewardType === 'second'
-    const contractAddress = isSecond ? process.env.REWARD_CLAIMER_SECOND_ADDRESS : process.env.REWARD_CLAIMER_ADDRESS
-    const tokenAddress = isSecond ? process.env.REWARD_TOKEN_SECOND_ADDRESS : process.env.REWARD_TOKEN_ADDRESS
+    // Use same contract for all reward types (first, second, jackpot)
+    const contractAddress = process.env.REWARD_CLAIMER_ADDRESS
+    const tokenAddress = process.env.REWARD_TOKEN_ADDRESS
     const pk = process.env.REWARD_SIGNER_PRIVATE_KEY
     const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 8453)
 

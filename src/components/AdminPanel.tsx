@@ -226,8 +226,15 @@ export function AdminPanel() {
     }
 
     // Check if there are predictions in this round
-    const guesses = getGuessesForRound(closedRound.id)
-    if (guesses.length === 0) {
+    const roundGuesses = getGuessesForRound(closedRound.id)
+    console.log('🔍 [AdminPanel] Checking guesses for round:', {
+      roundId: closedRound.id,
+      roundNumber: closedRound.roundNumber,
+      guessCount: roundGuesses.length,
+      guesses: roundGuesses.map(g => ({ id: g.id, roundId: g.roundId, username: g.username, guess: g.guess }))
+    })
+    
+    if (roundGuesses.length === 0) {
       toast({
         title: '⚠️ No Predictions',
         description: `Round #${closedRound.roundNumber || closedRound.id} has no player predictions. Cannot calculate winners.`,
@@ -280,13 +287,12 @@ export function AdminPanel() {
         }
       }
 
-      // Find winners
-      const guesses = getGuessesForRound(closedRound.id)
-      if (guesses.length === 0) {
+      // Use the guesses we already fetched (roundGuesses)
+      if (roundGuesses.length === 0) {
         throw new Error('No predictions in this round')
       }
 
-      const sorted = [...guesses].sort((a, b) => {
+      const sorted = [...roundGuesses].sort((a, b) => {
         const diffA = Math.abs(a.guess - actualTxCount)
         const diffB = Math.abs(b.guess - actualTxCount)
         if (diffA !== diffB) return diffA - diffB

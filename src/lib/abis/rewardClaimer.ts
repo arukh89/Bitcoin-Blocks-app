@@ -1,6 +1,89 @@
-// RewardClaimer ABI provided by user
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const RewardClaimerAbi: any = [
+// RewardClaimer ABI from deployed contract 0x80Fd04c6C4D43C2434512CdAe05E30c46f3a330D
+export const RewardClaimerAbi = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_token", "type": "address" },
+      { "internalType": "address", "name": "_signer", "type": "address" },
+      { "internalType": "address", "name": "_owner", "type": "address" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  { "inputs": [], "name": "ECDSAInvalidSignature", "type": "error" },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "length", "type": "uint256" }],
+    "name": "ECDSAInvalidSignatureLength",
+    "type": "error"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "s", "type": "bytes32" }],
+    "name": "ECDSAInvalidSignatureS",
+    "type": "error"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "owner", "type": "address" }],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  { "inputs": [], "name": "ReentrancyGuardReentrantCall", "type": "error" },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "uint256", "name": "roundId", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "fid", "type": "uint256" },
+      { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "indexed": false, "internalType": "uint8", "name": "prizeType", "type": "uint8" }
+    ],
+    "name": "Claimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "previousOwner", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "newOwner", "type": "address" }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "Rescue",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "address", "name": "oldSigner", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "newSigner", "type": "address" }
+    ],
+    "name": "SignerUpdated",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "CLAIM_TYPEHASH",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DOMAIN_SEPARATOR",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
   {
     "inputs": [
       { "internalType": "uint256", "name": "roundId", "type": "uint256" },
@@ -18,80 +101,6 @@ export const RewardClaimerAbi: any = [
     "type": "function"
   },
   {
-    "inputs": [
-      { "internalType": "address", "name": "_token", "type": "address" },
-      { "internalType": "address", "name": "_signer", "type": "address" },
-      { "internalType": "uint256", "name": "chainId", "type": "uint256" }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  { "inputs": [], "name": "ECDSAInvalidSignature", "type": "error" },
-  {
-    "inputs": [{ "internalType": "uint256", "name": "length", "type": "uint256" }],
-    "name": "ECDSAInvalidSignatureLength",
-    "type": "error"
-  },
-  {
-    "inputs": [{ "internalType": "bytes32", "name": "s", "type": "bytes32" }],
-    "name": "ECDSAInvalidSignatureS",
-    "type": "error"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": false, "internalType": "uint256", "name": "roundId", "type": "uint256" },
-      { "indexed": false, "internalType": "uint256", "name": "fid", "type": "uint256" },
-      { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" },
-      { "indexed": false, "internalType": "uint8", "name": "prizeType", "type": "uint8" }
-    ],
-    "name": "Claimed",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "to", "type": "address" },
-      { "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "name": "rescue",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "name": "Rescue",
-    "type": "event"
-  },
-  {
-    "inputs": [{ "internalType": "address", "name": "_signer", "type": "address" }],
-    "name": "setSigner",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "oldSigner", "type": "address" },
-      { "indexed": true, "internalType": "address", "name": "newSigner", "type": "address" }
-    ],
-    "name": "SignerUpdated",
-    "type": "event"
-  },
-  {
-    "inputs": [],
-    "name": "CLAIM_TYPEHASH",
-    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
     "name": "claimed",
     "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
@@ -100,8 +109,8 @@ export const RewardClaimerAbi: any = [
   },
   {
     "inputs": [],
-    "name": "DOMAIN_SEPARATOR",
-    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "name": "getBalance",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
     "stateMutability": "view",
     "type": "function"
   },
@@ -114,9 +123,33 @@ export const RewardClaimerAbi: any = [
   },
   {
     "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "to", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "rescue",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "_signer", "type": "address" }],
+    "name": "setSigner",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "signer",
     "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "stateMutility": "view",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -125,5 +158,13 @@ export const RewardClaimerAbi: any = [
     "outputs": [{ "internalType": "contract IERC20", "name": "", "type": "address" }],
     "stateMutability": "view",
     "type": "function"
-  }
-]
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "newOwner", "type": "address" }],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  { "stateMutability": "payable", "type": "receive" }
+] as const
