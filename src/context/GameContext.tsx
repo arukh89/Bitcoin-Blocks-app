@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { Round, Guess, Log, ChatMessage, PrizeConfiguration } from '@/types/game'
 import type { UserStats, CheckInRecord, WeeklyLeaderboardEntry, CheckInResult } from '@/types/checkin'
 import { useAuth, ADMIN_FIDS, isAdminFid, isAdminWallet, ADMIN_WALLETS } from '@/context/AuthContext'
@@ -202,6 +202,116 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [user])
+
+  // Auto-check and close rounds when time expires or block is found
+  useEffect(() => {
+    if (!connected) return
+
+    const checkAndCloseRounds = async () => {
+      const openRound = rounds.find(r => r.status === 'open')
+      if (!openRound) return
+
+      const now = Date.now()
+      
+      // Check if round expired by time
+      if (now >= openRound.endTime) {
+        console.log('⏰ Round expired by time, closing...')
+        await closeRoundAndDetermineWinner(openRound)
+        return
+      }
+
+      // Check if target block exists (if block_number is set)
+      if (openRound.blockNumber) {
+        try {
+          const res = await fetch(`/api/mempool?action=block-height&height=${openRound.blockNumber}`)
+          if (res.ok) {
+            const data = await res.json()
+            if (data && !data.error) {
+              console.log('🧱 Target block found, closing round...')
+              await closeRoundAndDetermineWinner(openRound, data)
+            }
+          }
+        } catch (e) {
+          console.log('Block check failed:', e)
+        }
+      }
+    }
+
+    const closeRoundAndDetermineWinner = async (round: Round, blockData?: any) => {
+      try {
+        // Get actual tx count from block or latest block
+        let actualTxCount = blockData?.tx_count
+        let blockHash = blockData?.id
+
+        if (!actualTxCount && round.blockNumber) {
+          // Fetch block data
+          const blockRes = await fetch(`/api/mempool?action=block&hash=${round.blockNumber}`)
+          if (blockRes.ok) {
+            const block = await blockRes.json()
+            actualTxCount = block?.tx_count
+            blockHash = block?.id
+          }
+        }
+
+        if (!actualTxCount) {
+          // Fallback: get latest block
+          const latestRes = await fetch('/api/mempool?action=recent-blocks')
+          if (latestRes.ok) {
+            const blocks = await latestRes.json()
+            if (blocks?.[0]) {
+              actualTxCount = blocks[0].tx_count
+              blockHash = blocks[0].id
+            }
+          }
+        }
+
+        if (!actualTxCount) {
+          console.log('Could not get tx count, just closing round')
+          await supabase.from('rounds').update({ status: 'closed' }).eq('id', Number(round.id))
+          return
+        }
+
+        // Find winner (closest guess)
+        const roundGuesses = guesses.filter(g => g.roundId === round.id)
+        if (roundGuesses.length === 0) {
+          await supabase.from('rounds').update({ 
+            status: 'finished', 
+            actual_tx_count: actualTxCount,
+            block_hash: blockHash 
+          }).eq('id', Number(round.id))
+          return
+        }
+
+        const sorted = [...roundGuesses].sort((a, b) => {
+          const diffA = Math.abs(a.guess - actualTxCount)
+          const diffB = Math.abs(b.guess - actualTxCount)
+          if (diffA !== diffB) return diffA - diffB
+          return a.submittedAt - b.submittedAt
+        })
+
+        const winner = sorted[0]
+        const winnerFid = winner.address.startsWith('fid-') ? Number(winner.address.slice(4)) : null
+
+        await supabase.from('rounds').update({
+          status: 'finished',
+          actual_tx_count: actualTxCount,
+          block_hash: blockHash,
+          winning_fid: winnerFid
+        }).eq('id', Number(round.id))
+
+        console.log('✅ Round closed! Winner:', winner.username, 'Guess:', winner.guess, 'Actual:', actualTxCount)
+      } catch (e) {
+        console.error('Failed to close round:', e)
+      }
+    }
+
+    // Check every 10 seconds
+    const interval = setInterval(checkAndCloseRounds, 10000)
+    // Also check immediately
+    checkAndCloseRounds()
+
+    return () => clearInterval(interval)
+  }, [connected, rounds, guesses])
 
   // Load user stats when user changes
   useEffect(() => {

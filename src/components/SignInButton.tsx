@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,6 @@ export function SignInButton() {
   const [showDialog, setShowDialog] = useState<boolean>(false)
   const [neynarUrl, setNeynarUrl] = useState<string>('')
   const [selectedChain, setSelectedChain] = useState<'base' | 'arbitrum'>(walletChain || 'base')
-  const didAutoWalletRef = useRef(false)
   const { toast } = useToast()
   
   // Wagmi hooks for wallet connection
@@ -26,18 +25,9 @@ export function SignInButton() {
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
 
-  // Auto sign in when wallet connects (web only), guarded to avoid re-login after sign out
-  useEffect(() => {
-    if (didAutoWalletRef.current) return
-    if (!isConnected || !address || user) return
-    if (isInFarcaster) return // never auto wallet in mini app
-    try {
-      const skip = typeof window !== 'undefined' ? window.sessionStorage.getItem('bb_skip_auto_wallet') : null
-      if (skip === '1') return
-    } catch {}
-    didAutoWalletRef.current = true
-    void signInWithWallet(address)
-  }, [isConnected, address, user, isInFarcaster, signInWithWallet])
+  // DISABLED: Auto sign in when wallet connects
+  // Users must manually click Sign In button
+  // This prevents unwanted wallet popups on page load
 
   const handleNeynarSignIn = async (): Promise<void> => {
     try {
@@ -73,16 +63,9 @@ export function SignInButton() {
   }
 
   const handleSignOut = (): void => {
-    try {
-      // prevent auto wallet relogin this session
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem('bb_skip_auto_wallet', '1')
-      }
-    } catch {}
+    // Just sign out from app state, don't disconnect wallet
+    // This prevents wallet popup on signout
     signOut()
-    if (isConnected) {
-      disconnect()
-    }
     setShowDialog(false)
   }
 
