@@ -10,15 +10,6 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' },
     ],
   },
-  webpack: (config) => {
-    config.resolve = config.resolve || {}
-    config.resolve.alias = {
-      ...(config.resolve.alias || {}),
-      '@react-native-async-storage/async-storage': false,
-      'pino-pretty': false,
-    }
-    return config
-  },
   async headers() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     const supabaseHost = supabaseUrl.replace(/^https?:\/\//, '')

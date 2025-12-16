@@ -7,22 +7,84 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, Flame, Trophy, Gift } from 'lucide-react'
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi'
+import { parseEther } from 'viem'
+import { useToast } from '@/hooks/use-toast'
+
+// Check-in contract address (receives 0 ETH tx as proof of check-in)
+const CHECKIN_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000' as `0x${string}`
 
 export function DailyCheckIn() {
-  const { user } = useAuth()
+  const { user, walletAddress } = useAuth()
   const { checkIn, userStats, hasCheckedInToday } = useGame()
   const [showReward, setShowReward] = useState<boolean>(false)
   const [isCheckingIn, setIsCheckingIn] = useState<boolean>(false)
+  const { toast } = useToast()
+  
+  // Wagmi hooks for onchain transaction
+  const { isConnected } = useAccount()
+  const { sendTransaction, data: txHash, isPending: isSending } = useSendTransaction()
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({
+    hash: txHash,
+  })
 
   const handleCheckIn = async (): Promise<void> => {
     if (!user) return
     
-    setIsCheckingIn(true)
-    const res = await checkIn(user.address, user.username, user.pfpUrl)
-    setIsCheckingIn(false)
-    if (res.success) {
-      setShowReward(true)
-      setTimeout(() => setShowReward(false), 3000)
+    // If user logged in via wallet, require onchain transaction
+    if (walletAddress && isConnected) {
+      setIsCheckingIn(true)
+      try {
+        // Send 0 ETH transaction to burn address as proof of check-in
+        // User pays gas fee on Base mainnet
+        sendTransaction({
+          to: CHECKIN_CONTRACT_ADDRESS,
+          value: parseEther('0'),
+          data: `0x${Buffer.from(`checkin:${user.address}:${Date.now()}`).toString('hex')}` as `0x${string}`,
+        }, {
+          onSuccess: async (hash) => {
+            toast({
+              title: 'Transaction Sent',
+              description: 'Waiting for confirmation...',
+            })
+            // Wait a bit for confirmation then record check-in
+            const res = await checkIn(user.address, user.username, user.pfpUrl)
+            setIsCheckingIn(false)
+            if (res.success) {
+              setShowReward(true)
+              setTimeout(() => setShowReward(false), 3000)
+              toast({
+                title: 'Check-in Successful!',
+                description: `You earned ${res.pointsEarned} points. Tx: ${hash.slice(0, 10)}...`,
+              })
+            }
+          },
+          onError: (error) => {
+            setIsCheckingIn(false)
+            toast({
+              title: 'Transaction Failed',
+              description: error.message || 'Failed to send check-in transaction',
+              variant: 'destructive',
+            })
+          },
+        })
+      } catch (error) {
+        setIsCheckingIn(false)
+        toast({
+          title: 'Check-in Failed',
+          description: 'Could not initiate transaction',
+          variant: 'destructive',
+        })
+      }
+    } else {
+      // Farcaster-only users (no wallet connected) - just record in DB
+      setIsCheckingIn(true)
+      const res = await checkIn(user.address, user.username, user.pfpUrl)
+      setIsCheckingIn(false)
+      if (res.success) {
+        setShowReward(true)
+        setTimeout(() => setShowReward(false), 3000)
+      }
     }
   }
 
@@ -65,15 +127,25 @@ export function DailyCheckIn() {
         {/* Check-in Button */}
         <Button
           onClick={handleCheckIn}
-          disabled={!canCheckIn || isCheckingIn}
+          disabled={!canCheckIn || isCheckingIn || isSending || isConfirming}
           className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-6"
         >
-          {isCheckingIn ? 'Checking In...' : canCheckIn ? 'Check In Today' : 'Already Checked In'}
+          {isSending ? '⏳ Confirm in Wallet...' : 
+           isConfirming ? '⏳ Confirming...' : 
+           isCheckingIn ? 'Checking In...' : 
+           canCheckIn ? (walletAddress && isConnected ? '🔗 Check In (Pay Gas)' : 'Check In Today') : 
+           'Already Checked In'}
         </Button>
+
+        {walletAddress && isConnected && canCheckIn && (
+          <div className="text-center text-xs text-gray-400">
+            💡 Check-in requires a small gas fee on Base network
+          </div>
+        )}
 
         {!canCheckIn && (
           <div className="text-center text-sm text-green-400">
-            ✓ You’ve checked in today! Come back tomorrow.
+            ✓ You&apos;ve checked in today! Come back tomorrow.
           </div>
         )}
 

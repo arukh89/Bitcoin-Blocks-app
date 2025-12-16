@@ -1,9 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import NextDynamic from 'next/dynamic'
-const Providers = NextDynamic(() => import('./providers').then(m => m.Providers), { ssr: false })
-import { Toaster } from '@/components/ui/sonner'
+import { ClientLayout } from './client-layout'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -18,10 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased font-sans`}>
-        <Providers>
-          {children}
-          <Toaster richColors position="top-center" />
-        </Providers>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   )

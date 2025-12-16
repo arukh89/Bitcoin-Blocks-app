@@ -149,9 +149,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Try resolve wallet -> Farcaster
       try {
         const url = `/api/farcaster/resolve-by-address?address=${encodeURIComponent(address)}`
+        console.log('🔍 Resolving wallet to Farcaster:', url)
         const res = await fetch(url)
         if (res.ok) {
           const data: any = await res.json()
+          console.log('🔍 Resolve response:', data)
           if (data?.found && data?.fid) {
             const fid: number = Number(data.fid)
             const username: string = data.username || `user${fid}`
@@ -165,18 +167,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             setUser(userFromFarcaster)
             setUserFid(fid)
-            console.log('🔗 Resolved wallet -> Farcaster identity:', { fid, username })
+            setWalletAddress(address) // Keep wallet address for onchain actions
+            console.log('🔗 Resolved wallet -> Farcaster identity:', { fid, username, wallet: address })
             return
+          } else {
+            console.log('⚠️ Wallet not linked to Farcaster:', data?.reason || 'unknown')
           }
         }
       } catch (e) {
         console.warn('Resolver failed, using wallet identity', e)
       }
 
-      // Fallback to plain wallet identity
+      // Fallback to plain wallet identity (cannot guess, but can check-in)
       setUser(baseUser)
       setUserFid(null)
-      console.log('✅ Wallet authentication successful (no Farcaster linkage)')
+      console.log('✅ Wallet authentication successful (no Farcaster linkage - limited features)')
     } catch (error) {
       console.error('❌ Wallet auth failed:', error)
       throw error

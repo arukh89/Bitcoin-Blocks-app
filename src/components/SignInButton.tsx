@@ -105,13 +105,14 @@ export function SignInButton() {
   // If authenticated via other methods
   if (user) {
     return (
-      <Button onClick={() => setShowDialog(true)} variant="outline" className="glass-card text-white border-green-500/50 hover:bg-green-500/20">
+      <Button onClick={handleSignOut} variant="outline" className="glass-card text-white border-green-500/50 hover:bg-green-500/20">
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
             <AvatarImage src={user.pfpUrl} alt={user.username} />
             <AvatarFallback>{user.username[0]?.toUpperCase() || 'U'}</AvatarFallback>
           </Avatar>
           <span>{user.username}</span>
+          <span className="opacity-60">• Sign Out</span>
         </div>
       </Button>
     )

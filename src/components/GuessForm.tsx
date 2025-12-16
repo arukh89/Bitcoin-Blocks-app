@@ -189,7 +189,12 @@ export function GuessForm() {
               transition={{ duration: 2, repeat: Infinity }}
             >
               <p className="text-2xl mb-2">🟣</p>
-              <p className="text-purple-300 text-sm font-medium">Farcaster login required to guess</p>
+              <p className="text-purple-300 text-sm font-medium">Farcaster account required to guess</p>
+              <p className="text-purple-400 text-xs mt-2">
+                Your wallet is not linked to a Farcaster account.
+                <br />
+                Link your wallet at <a href="https://warpcast.com" target="_blank" rel="noopener noreferrer" className="underline">warpcast.com</a> or sign in with Farcaster QR.
+              </p>
             </motion.div>
           ) : !activeRound ? (
             <motion.div
