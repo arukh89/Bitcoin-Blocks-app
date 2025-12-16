@@ -106,7 +106,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [rounds, setRounds] = useState<Round[]>([])
   const [guesses, setGuesses] = useState<Guess[]>([])
-  const [logs, setLogs] = useState<Log[]>([])
+  const [logs, _setLogs] = useState<Log[]>([])
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [prizeConfig, setPrizeConfig] = useState<PrizeConfiguration | null>(null)
   const [connected, setConnected] = useState<boolean>(false)
@@ -168,18 +168,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
             if (payload.new) setPrizeConfig(convertDbPrizeConfig(payload.new))
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, (payload) => {
-            if (payload.new && user && payload.new.user_identifier === user.address) {
+            const newData = payload.new as Record<string, unknown> | null
+            if (newData && user && newData.user_identifier === user.address) {
               setUserStats({
-                userIdentifier: payload.new.user_identifier,
-                username: payload.new.username,
-                pfpUrl: payload.new.pfp_url,
-                totalPoints: payload.new.total_points,
-                currentStreak: payload.new.current_streak,
-                longestStreak: payload.new.longest_streak,
-                lastCheckinDate: new Date(payload.new.last_checkin_date).getTime(),
-                totalCheckins: payload.new.total_checkins,
-                createdAt: new Date(payload.new.created_at).getTime(),
-                updatedAt: new Date(payload.new.updated_at).getTime()
+                userIdentifier: newData.user_identifier as string,
+                username: newData.username as string,
+                pfpUrl: (newData.pfp_url as string) || '',
+                totalPoints: newData.total_points as number,
+                currentStreak: newData.current_streak as number,
+                longestStreak: newData.longest_streak as number,
+                lastCheckinDate: new Date(newData.last_checkin_date as string).getTime(),
+                totalCheckins: newData.total_checkins as number,
+                createdAt: new Date(newData.created_at as string).getTime(),
+                updatedAt: new Date(newData.updated_at as string).getTime()
               })
             }
           })
@@ -205,26 +206,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // Load user stats when user changes
   useEffect(() => {
     if (!user) return
+    const userAddress = user.address
 
     async function loadUserStats() {
       const { data } = await supabase
         .from('user_stats')
         .select('*')
-        .eq('user_identifier', user.address)
+        .eq('user_identifier', userAddress)
         .single()
 
       if (data) {
         setUserStats({
           userIdentifier: data.user_identifier,
           username: data.username,
-          pfpUrl: data.pfp_url,
+          pfpUrl: data.pfp_url || '',
           totalPoints: data.total_points,
           currentStreak: data.current_streak,
           longestStreak: data.longest_streak,
           lastCheckinDate: data.last_checkin_date ? new Date(data.last_checkin_date).getTime() : 0,
           totalCheckins: data.total_checkins,
-          createdAt: new Date(data.created_at).getTime(),
-          updatedAt: new Date(data.updated_at).getTime()
+          createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
+          updatedAt: data.updated_at ? new Date(data.updated_at).getTime() : Date.now()
         })
       }
 
@@ -232,7 +234,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const { data: checkins } = await supabase
         .from('checkins')
         .select('*')
-        .eq('user_identifier', user.address)
+        .eq('user_identifier', userAddress)
         .order('checkin_date', { ascending: false })
 
       if (checkins) {
@@ -240,7 +242,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           checkinId: String(c.id),
           userIdentifier: c.user_identifier,
           username: c.username,
-          pfpUrl: c.pfp_url,
+          pfpUrl: c.pfp_url || '',
           checkinDate: new Date(c.checkin_date).getTime(),
           pointsEarned: c.points_earned,
           streakCount: c.streak_count
@@ -269,7 +271,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // Calculate weekly leaderboard
   useEffect(() => {
     async function loadLeaderboard() {
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+      // Weekly filter can be added later if needed
       
       const { data: stats } = await supabase
         .from('user_stats')
@@ -466,7 +468,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
 
       // Get or create user stats
-      let { data: stats } = await supabase
+      const { data: stats } = await supabase
         .from('user_stats')
         .select('*')
         .eq('user_identifier', userIdentifier)

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const allowBypass = devNoDb && process.env.NODE_ENV !== 'production'
 
     let eligible = true
-    let epochDay = dayId !== undefined && dayId !== null ? BigInt(dayId) : getTodayDayId()
+    const epochDay = dayId !== undefined && dayId !== null ? BigInt(dayId) : getTodayDayId()
 
     if (!allowBypass) {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .gte('checkin_date', todayStart.toISOString())
         .limit(1)
 
-      eligible = checkins && checkins.length > 0
+      eligible = !checkins || checkins.length === 0
     }
 
     if (!eligible) {
