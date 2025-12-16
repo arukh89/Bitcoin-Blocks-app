@@ -12,7 +12,9 @@ import { injected } from "wagmi/connectors"
 // Export a singleton QueryClient to avoid duplicate caches
 const queryClient = new QueryClient()
 
-const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || base.id)
+// Handle comma-separated chain IDs (take first one) or single value
+const chainIdEnv = process.env.NEXT_PUBLIC_CHAIN_ID || String(base.id)
+const CHAIN_ID = Number(chainIdEnv.split(',')[0].trim()) || base.id
 const SELECTED_CHAIN = CHAIN_ID === baseSepolia.id ? baseSepolia : base
 
 export const config = createConfig({
