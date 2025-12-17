@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react"
 import { useGame } from "@/context/GameContext"
 import { useAuth } from "@/context/AuthContext"
-import { ensureWalletSession } from "@/lib/wallet-session"
+import { getWalletAddress, sendTransaction } from "@/lib/ethereum-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
@@ -20,7 +20,6 @@ async function requestSignature(params: {
   const res = await fetch('/api/rounds/sign-claim', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(params),
   })
   if (!res.ok) {
@@ -32,7 +31,7 @@ async function requestSignature(params: {
 
 export default function ClaimsPage() {
   const { rounds, guesses, prizeConfig } = useGame()
-  const { user } = useAuth()
+  const { user, walletAddress } = useAuth()
   const { toast } = useToast()
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -55,19 +54,29 @@ export default function ClaimsPage() {
     try {
       if (!user?.address?.startsWith('fid-')) throw new Error('Login with Farcaster required')
       setBusyId(`${roundId}:${type}`)
-      const walletAddr = await ensureWalletSession()
+      
+      // Get wallet address from auth context or request from provider
+      const recipient = walletAddress || await getWalletAddress()
       const fid = user.address.slice(4)
       const amount = type === 'first' ? (prizeConfig?.firstPlaceAmount || '0') : type === 'second' ? (prizeConfig?.secondPlaceAmount || '0') : (prizeConfig?.jackpotAmount || '0')
-      const data = await requestSignature({ roundId, rewardType: type, recipient: walletAddr, amount, fid })
+      
+      const data = await requestSignature({ roundId, rewardType: type, recipient, amount, fid })
+      
       if (data?.tx?.to && data?.tx?.data) {
-        const eth = (globalThis as any).ethereum
-        await eth.request({ method: 'eth_sendTransaction', params: [{ to: data.tx.to, data: data.tx.data, value: '0x0' }] })
-        toast({ title: 'Claim submitted', description: 'Transaction sent' })
+        toast({ title: 'Confirm in wallet', description: 'Please approve the transaction' })
+        const txHash = await sendTransaction({
+          to: data.tx.to,
+          data: data.tx.data,
+          value: '0x0'
+        })
+        toast({ title: 'Claim submitted', description: `Tx: ${txHash.slice(0, 10)}...` })
       } else {
-        toast({ title: 'Signature ready', description: 'Complete onchain step from wallet modal' })
+        toast({ title: 'Signature ready', description: 'Complete onchain step from wallet' })
       }
     } catch (e: any) {
-      toast({ title: 'Claim failed', description: e?.message || 'Error', variant: 'destructive' })
+      if (!e?.message?.includes('rejected') && !e?.message?.includes('denied')) {
+        toast({ title: 'Claim failed', description: e?.message || 'Error', variant: 'destructive' })
+      }
     } finally {
       setBusyId(null)
     }

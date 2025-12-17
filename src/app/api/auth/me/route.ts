@@ -18,26 +18,31 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Missing token' }, { status: 401 })
     }
 
-    const AUTH_DOMAIN = process.env.AUTH_DOMAIN
-    const FARCASTER_API_KEY = process.env.FARCASTER_API_KEY
+    // Derive auth domain from NEXT_PUBLIC_APP_URL (removes https:// prefix)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY
 
-    if (!AUTH_DOMAIN) {
-      return NextResponse.json({ error: 'Server misconfiguration: AUTH_DOMAIN is not set' }, { status: 500 })
+    if (!appUrl) {
+      return NextResponse.json({ error: 'Server misconfiguration: NEXT_PUBLIC_APP_URL is not set' }, { status: 500 })
     }
-    if (!FARCASTER_API_KEY) {
-      return NextResponse.json({ error: 'Server misconfiguration: FARCASTER_API_KEY is not set' }, { status: 500 })
+    if (!NEYNAR_API_KEY) {
+      return NextResponse.json({ error: 'Server misconfiguration: NEYNAR_API_KEY is not set' }, { status: 500 })
     }
+
+    // Extract domain from URL (e.g., "https://example.com" -> "example.com")
+    const authDomain = appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
 
     const payload = await client.verifyJwt({
       token,
-      domain: AUTH_DOMAIN
+      domain: authDomain
     })
 
     
 
-    const userResponse = await fetch(`https://api.farcaster.xyz/v2/user?fid=${payload.sub}`, {
+    const userResponse = await fetch(`https://api.neynar.com/v2/farcaster/user/bulk?fids=${payload.sub}`, {
       headers: {
-        'api-key': FARCASTER_API_KEY
+        'accept': 'application/json',
+        'api_key': NEYNAR_API_KEY
       }
     })
 
@@ -51,14 +56,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const userData = await userResponse.json()
-    const user = userData.result?.user || userData.user
+    // Neynar bulk endpoint returns { users: [...] }
+    const user = userData.users?.[0] || userData.result?.user || userData.user
 
     return NextResponse.json({
-      fid: user.fid || payload.sub,
-      username: user.username,
-      displayName: user.display_name || user.displayName,
-      pfpUrl: user.pfp_url || user.pfpUrl,
-      bio: user.profile?.bio?.text || user.bio
+      fid: user?.fid || payload.sub,
+      username: user?.username || `user-${payload.sub}`,
+      displayName: user?.display_name || user?.displayName || `User ${payload.sub}`,
+      pfpUrl: user?.pfp_url || user?.pfpUrl || '',
+      bio: user?.profile?.bio?.text || user?.bio || ''
     })
   } catch (error) {
     console.error('Authentication error:', error)

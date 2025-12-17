@@ -1,24 +1,32 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerSupabase } from '@/lib/supabase-server'
 
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
-const MEMPOOL_API = 'https://mempool.space/api'
+// Use env var with fallback to public mempool API
+const MEMPOOL_API = process.env.MEMPOOL_API_BASE || 'https://mempool.space/api'
 
 export async function GET(request: Request) {
-  // Verify cron secret for security (optional but recommended)
+  // Verify cron secret for security (REQUIRED)
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // SECURITY: Always require CRON_SECRET in production
+  if (!cronSecret) {
+    console.error('CRON_SECRET not configured')
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 })
+  }
+  
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createServerSupabase()
+    if (!supabase) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+    }
 
     // Get all open rounds
     const { data: openRounds, error: roundsError } = await supabase

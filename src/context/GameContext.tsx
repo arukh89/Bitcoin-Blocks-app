@@ -3,7 +3,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { Round, Guess, Log, ChatMessage, PrizeConfiguration } from '@/types/game'
 import type { UserStats, CheckInRecord, WeeklyLeaderboardEntry, CheckInResult } from '@/types/checkin'
-import { useAuth, ADMIN_FIDS, isAdminFid, isAdminWallet, ADMIN_WALLETS } from '@/context/AuthContext'
+import { useAuth } from '@/context/AuthContext'
+import { ADMIN_FIDS, ADMIN_WALLETS, isAdminFid, isAdminWallet } from '@/lib/admin-constants'
 import { supabase } from '@/lib/supabase-client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -442,7 +443,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     console.log('✅ Round created successfully!')
   }, [connected])
 
-  // Submit a guess
+  // Submit a guess with race condition protection
   const submitGuess = useCallback(async (
     roundId: string,
     address: string,
@@ -456,15 +457,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (!round || round.status !== 'open') return false
     if (Date.now() >= round.endTime) return false
 
-    // Check if already guessed
-    const hasGuessed = guesses.some(g => g.roundId === roundId && g.address.toLowerCase() === address.toLowerCase())
-    if (hasGuessed) return false
-
     // Require FID
     if (!address.startsWith('fid-')) return false
     const fid = Number(address.slice(4))
     if (!Number.isFinite(fid) || fid <= 0) return false
 
+    // Server-side check for existing guess (race condition protection)
+    // The database should have a unique constraint on (round_id, fid)
+    const { data: existingGuess } = await supabase
+      .from('guesses')
+      .select('id')
+      .eq('round_id', Number(roundId))
+      .eq('fid', fid)
+      .single()
+
+    if (existingGuess) {
+      console.log('⚠️ User already has a guess for this round')
+      return false
+    }
+
+    // Insert with conflict handling
     const { error } = await supabase.from('guesses').insert({
       round_id: Number(roundId),
       fid,
@@ -474,13 +486,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     })
 
     if (error) {
+      // Handle unique constraint violation (23505 is PostgreSQL unique violation)
+      if (error.code === '23505') {
+        console.log('⚠️ Duplicate guess detected (constraint violation)')
+        return false
+      }
       console.error('Failed to submit guess:', error)
       return false
     }
 
     console.log('✅ Guess submitted!')
     return true
-  }, [connected, rounds, guesses])
+  }, [connected, rounds])
 
   // End a round
   const endRound = useCallback(async (roundId: string): Promise<boolean> => {
@@ -553,7 +570,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     console.log('✅ Chat message sent!')
   }, [connected])
 
-  // Daily check-in
+  // Daily check-in with race condition protection
   const checkIn = useCallback(async (
     userIdentifier: string,
     username: string,
@@ -565,16 +582,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const now = new Date()
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-      // Check if already checked in today
-      const { data: existingCheckin } = await supabase
+      // Atomic check-and-insert using upsert with conflict detection
+      // First, try to insert the checkin record - if it fails due to constraint, user already checked in
+      const { data: newCheckin, error: checkinError } = await supabase
         .from('checkins')
+        .insert({
+          user_identifier: userIdentifier,
+          username,
+          pfp_url: pfpUrl,
+          points_earned: 0, // Will update after calculating
+          streak_count: 1,  // Will update after calculating
+          checkin_date: now.toISOString()
+        })
         .select('id')
-        .eq('user_identifier', userIdentifier)
-        .gte('checkin_date', todayStart.toISOString())
         .single()
 
-      if (existingCheckin) {
-        return { success: false, error: 'Already checked in today' }
+      // Handle unique constraint violation (already checked in today)
+      if (checkinError) {
+        if (checkinError.code === '23505') {
+          return { success: false, error: 'Already checked in today' }
+        }
+        throw checkinError
       }
 
       // Get or create user stats
@@ -626,14 +654,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
         })
       }
 
-      // Record the checkin
-      await supabase.from('checkins').insert({
-        user_identifier: userIdentifier,
-        username,
-        pfp_url: pfpUrl,
-        points_earned: totalPoints,
-        streak_count: newStreak
-      })
+      // Update the checkin record with correct points and streak
+      await supabase
+        .from('checkins')
+        .update({
+          points_earned: totalPoints,
+          streak_count: newStreak
+        })
+        .eq('id', newCheckin.id)
 
       console.log('✅ Check-in successful!')
       return { success: true, pointsEarned: totalPoints, newStreak }

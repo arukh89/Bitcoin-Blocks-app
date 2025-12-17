@@ -23,32 +23,12 @@ import { Button } from '@/components/ui/button'
 import { useGame } from '@/context/GameContext'
 import { useAuth } from '@/context/AuthContext'
 import sdk from "@farcaster/miniapp-sdk"
-import { useAddMiniApp } from "@/hooks/useAddMiniApp";
-import { useQuickAuth } from "@/hooks/useQuickAuth";
-import { useIsInFarcaster } from "@/hooks/useIsInFarcaster";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false)
   const { connected, prizeConfig, getSetting } = useGame()
-  const { user } = useAuth()
-    const { addMiniApp } = useAddMiniApp();
-    const isInFarcaster = useIsInFarcaster()
-    useQuickAuth(isInFarcaster)
-    useEffect(() => {
-      const tryAddMiniApp = async () => {
-        try {
-          await addMiniApp()
-        } catch (error) {
-          console.error('Failed to add mini app:', error)
-        }
-
-      }
-
-    
-
-      tryAddMiniApp()
-    }, [addMiniApp])
+  const { user, isInFarcaster } = useAuth()
   
   useEffect(() => {
     const initializeFarcaster = async () => {

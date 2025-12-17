@@ -1,112 +1,71 @@
 'use client'
 
-import { useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import sdk from '@farcaster/miniapp-sdk'
+import { getEthereumProvider } from '@/lib/ethereum-provider'
 
 export function SignInButton() {
-  const { user, isInFarcaster, signOut, signInWithWallet } = useAuth()
+  const { user, isInFarcaster, isInBaseApp, platform, signOut, signInWithFarcaster, signInWithWallet } = useAuth()
   const { toast } = useToast()
-  const isResolving = useRef<boolean>(false)
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Wagmi hooks
-  const { address, isConnected } = useAccount()
-  const { connectAsync, connectors, isPending } = useConnect()
-  const { disconnectAsync } = useDisconnect()
+  const handleSignIn = useCallback(async (): Promise<void> => {
+    if (isLoading) return
+    setIsLoading(true)
 
-  // Find the right connector based on environment
-  const getConnector = () => {
-    // In Farcaster mini app: use Farcaster/Warplet connector
-    if (isInFarcaster) {
-      const farcasterConnector = connectors.find(
-        (c) => /farcaster/i.test(c.name) || /mini.?app/i.test(c.name) || /warp/i.test(c.name)
-      )
-      if (farcasterConnector) return farcasterConnector
-    }
-    
-    // On web: use injected wallet (MetaMask, etc.)
-    const injectedConnector = connectors.find(
-      (c) => /injected/i.test(c.id) || /metamask/i.test(c.id)
-    )
-    if (injectedConnector) return injectedConnector
-    
-    // Fallback to first available
-    return connectors[0]
-  }
-
-  const handleSignIn = async (): Promise<void> => {
-    if (isResolving.current || isPending) return
-    
     try {
-      isResolving.current = true
-      
-      const connector = getConnector()
-      if (!connector) {
-        toast({
-          title: 'No Wallet Found',
-          description: 'Please install a wallet extension',
-          variant: 'destructive'
-        })
-        return
+      if (isInFarcaster) {
+        // In Farcaster mini app: get user from SDK context
+        console.log('🟣 Getting Farcaster user from SDK context...')
+        
+        const context = await sdk.context
+        
+        if (context?.user) {
+          signInWithFarcaster({
+            fid: context.user.fid,
+            username: context.user.username,
+            displayName: context.user.displayName,
+            pfpUrl: context.user.pfpUrl
+          })
+          toast({ title: 'Signed In', description: `Welcome, ${context.user.username || 'User'}!` })
+        } else {
+          throw new Error('No user in Farcaster context')
+        }
+      } else {
+        // On Base App or Web: use wallet provider
+        console.log(`🔗 Connecting wallet on ${platform}...`)
+        
+        const provider = await getEthereumProvider()
+        const accounts = await provider.request({ method: 'eth_requestAccounts' })
+        const address = accounts[0]
+        
+        if (address) {
+          await signInWithWallet(address)
+          toast({ title: 'Signed In', description: 'Welcome!' })
+        }
       }
-
-      console.log('🔐 Connecting with:', connector.name)
-      
-      // Connect wallet
-      const result = await connectAsync({ connector })
-      const walletAddress = result.accounts[0]
-      
-      if (!walletAddress) {
-        throw new Error('No address returned from wallet')
-      }
-
-      console.log('✅ Wallet connected:', walletAddress)
-      
-      // Resolve wallet to Farcaster identity
-      await signInWithWallet(walletAddress)
-      
-      toast({
-        title: 'Signed In',
-        description: 'Welcome to Bitcoin Blocks!'
-      })
     } catch (error: any) {
       console.error('Sign in failed:', error)
-      // Don't show error for user rejection
       if (!error?.message?.includes('rejected') && !error?.message?.includes('denied')) {
         toast({
           title: 'Sign In Failed',
-          description: error?.message || 'Could not connect wallet',
+          description: error?.message || 'Could not sign in',
           variant: 'destructive'
         })
       }
     } finally {
-      isResolving.current = false
+      setIsLoading(false)
     }
-  }
+  }, [isInFarcaster, isInBaseApp, platform, isLoading, signInWithFarcaster, signInWithWallet, toast])
 
-  const handleSignOut = async (): Promise<void> => {
-    try {
-      // Sign out from auth context
-      signOut()
-      
-      // Disconnect wallet
-      if (isConnected) {
-        await disconnectAsync()
-      }
-      
-      toast({
-        title: 'Signed Out',
-        description: 'See you next time!'
-      })
-    } catch (error) {
-      console.error('Sign out error:', error)
-      // Force sign out even if disconnect fails
-      signOut()
-    }
-  }
+  const handleSignOut = useCallback((): void => {
+    signOut()
+    toast({ title: 'Signed Out', description: 'See you next time!' })
+  }, [signOut, toast])
 
   // If authenticated - show user info and sign out button
   if (user) {
@@ -128,14 +87,21 @@ export function SignInButton() {
     )
   }
 
-  // Not authenticated - show sign in button
+  // Not authenticated - show sign in button with platform-specific label
+  const getButtonLabel = () => {
+    if (isLoading) return '⏳ Signing In...'
+    if (isInFarcaster) return '🟣 Sign In'
+    if (isInBaseApp) return '🔵 Connect Base'
+    return '🦊 Connect Wallet'
+  }
+
   return (
     <Button
       onClick={handleSignIn}
-      disabled={isPending || isResolving.current}
+      disabled={isLoading}
       className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold shadow-lg"
     >
-      {isPending ? '⏳ Connecting...' : '🔐 Sign In'}
+      {getButtonLabel()}
     </Button>
   )
 }

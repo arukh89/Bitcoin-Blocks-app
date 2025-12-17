@@ -4,36 +4,31 @@ import React, { createContext, useContext, useState, useEffect, useCallback, typ
 import sdk from '@farcaster/miniapp-sdk'
 import type { User } from '@/types/game'
 
-// Admin lists from env (no hardcoded values)
-const FIDS_RAW = process.env.NEXT_PUBLIC_ADMIN_FIDS
-const WALLETS_RAW = process.env.NEXT_PUBLIC_ADMIN_WALLETS
+// Re-export admin utilities from shared constants
+export {
+  ADMIN_FIDS,
+  ADMIN_WALLETS,
+  isAdminFid,
+  isAdminWallet,
+  isAdminUser
+} from '@/lib/admin-constants'
 
-if (!FIDS_RAW) console.warn('AuthContext: NEXT_PUBLIC_ADMIN_FIDS not set; admin FID list will be empty')
-if (!WALLETS_RAW) console.warn('AuthContext: NEXT_PUBLIC_ADMIN_WALLETS not set; admin wallet list will be empty')
+import { isAdminFid, isAdminWallet } from '@/lib/admin-constants'
 
-export const ADMIN_FIDS: number[] = (FIDS_RAW || '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean)
-  .map(n => Number(n))
-  .filter(n => Number.isFinite(n) && n > 0)
+// Only 2 auth modes: farcaster or wallet
+export type AuthMode = 'farcaster' | 'wallet'
 
-export function isAdminFid(fid: number): boolean {
-  return ADMIN_FIDS.includes(fid)
+// Platform detection
+export type Platform = 'farcaster' | 'base-app' | 'web'
+
+interface FarcasterUserData {
+  fid: number
+  username?: string
+  displayName?: string
+  pfpUrl?: string
+  custodyAddress?: string
+  verifications?: string[]
 }
-
-export const ADMIN_WALLETS: string[] = (WALLETS_RAW || '')
-  .split(',')
-  .map(s => s.trim().toLowerCase())
-  .filter(s => /^0x[a-f0-9]{40}$/.test(s))
-
-export function isAdminWallet(address: string): boolean {
-  if (!address) return false
-  const a = address.toLowerCase()
-  return ADMIN_WALLETS.includes(a)
-}
-
-export type AuthMode = 'farcaster-sdk' | 'neynar' | 'wallet'
 
 interface AuthContextType {
   user: User | null
@@ -41,13 +36,12 @@ interface AuthContextType {
   authMode: AuthMode | null
   isAuthenticated: boolean
   isInFarcaster: boolean
-  signInWithNeynar: () => Promise<void>
+  isInBaseApp: boolean
+  platform: Platform
+  signInWithFarcaster: (userData: FarcasterUserData) => void
   signInWithWallet: (address: string) => Promise<void>
   signOut: () => void
-  logout: () => void
   walletAddress: string | null
-  walletChain: 'base' | 'arbitrum' | null
-  setWalletChain: (chain: 'base' | 'arbitrum') => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -57,130 +51,124 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userFid, setUserFid] = useState<number | null>(null)
   const [authMode, setAuthMode] = useState<AuthMode | null>(null)
   const [isInFarcaster, setIsInFarcaster] = useState<boolean>(false)
+  const [isInBaseApp, setIsInBaseApp] = useState<boolean>(false)
+  const [platform, setPlatform] = useState<Platform>('web')
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [walletChain, setWalletChain] = useState<'base' | 'arbitrum' | null>(null)
 
-  // ===========================================
-  // DETECT FARCASTER CONTEXT (No auto-login)
-  // ===========================================
+  // Detect platform: Farcaster, Base App, or Web
   useEffect(() => {
-    const detectFarcaster = async (): Promise<void> => {
+    const detectPlatform = async (): Promise<void> => {
+      // Check for Base App first
+      const ua = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
+      const hasCoinbase = typeof window !== 'undefined' && !!(window as any).coinbaseWalletExtension
+      
+      if (ua.includes('base') || ua.includes('coinbase') || hasCoinbase) {
+        console.log('🔵 Running in Base App')
+        setIsInBaseApp(true)
+        setPlatform('base-app')
+        return
+      }
+
+      // Check for Farcaster
       try {
-        console.log('🟣 Checking Farcaster context...')
         await sdk.actions.ready()
         const context = await sdk.context
-        
         if (context) {
-          console.log('✅ Running in Farcaster mini app')
+          console.log('🟣 Running in Farcaster mini app')
           setIsInFarcaster(true)
+          setPlatform('farcaster')
+          return
         }
-        // NO AUTO-LOGIN - user must click Sign In button
-      } catch (error) {
-        console.log('ℹ️ Not in Farcaster context (web mode)')
-        setIsInFarcaster(false)
+      } catch {
+        // Not in Farcaster
       }
-    }
 
-    detectFarcaster()
+      console.log('🌐 Running in web browser')
+      setPlatform('web')
+    }
+    detectPlatform()
   }, [])
 
-  // ===========================================
-  // NEYNAR SIGN IN (Web Context)
-  // ===========================================
-  const signInWithNeynar = useCallback(async (): Promise<void> => {
-    try {
-      console.log('🔐 Starting Neynar authentication...')
-      
-      // Generate auth URL and redirect
-      // This will be implemented in SignInButton component
-      // using @neynar/react SDK
-      
-      setAuthMode('neynar')
-    } catch (error) {
-      console.error('❌ Neynar auth failed:', error)
-      throw error
+  // Sign in with Farcaster (from Quick Auth)
+  const signInWithFarcaster = useCallback((userData: FarcasterUserData): void => {
+    const fid = userData.fid
+    const isAdmin = isAdminFid(fid)
+    
+    const farcasterUser: User = {
+      address: `fid-${fid}`,
+      username: userData.username || `user${fid}`,
+      displayName: userData.displayName || userData.username || `User ${fid}`,
+      pfpUrl: userData.pfpUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=fid-${fid}`,
+      isAdmin
     }
+    
+    setUser(farcasterUser)
+    setUserFid(fid)
+    setAuthMode('farcaster')
+    
+    // Store wallet address if available
+    if (userData.custodyAddress) {
+      setWalletAddress(userData.custodyAddress)
+    } else if (userData.verifications?.length) {
+      setWalletAddress(userData.verifications[0])
+    }
+    
+    console.log('✅ Signed in with Farcaster:', { fid, username: farcasterUser.username })
   }, [])
 
-  // ===========================================
-  // WALLET SIGN IN (Onchain Base/Arbitrum)
-  // ===========================================
+  // Sign in with wallet (for web users without Farcaster)
   const signInWithWallet = useCallback(async (address: string): Promise<void> => {
+    const short = `${address.slice(0, 6)}...${address.slice(-4)}`
+    const isAdmin = isAdminWallet(address)
+    
+    setWalletAddress(address)
+    setAuthMode('wallet')
+
+    // Try to resolve wallet to Farcaster identity
     try {
-      console.log('💰 Wallet sign in:', address)
-
-      // base wallet identity (fallback if no Farcaster match)
-      const short = `${address.slice(0, 6)}...${address.slice(-4)}`
-      const walletIsAdmin = isAdminWallet(address)
-      const baseUser: User = {
-        address,
-        username: short,
-        displayName: short,
-        pfpUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
-        isAdmin: walletIsAdmin,
-      }
-
-      setWalletAddress(address)
-      setWalletChain(walletChain || 'base') // Default to base if not set
-      setAuthMode('wallet')
-
-      // Try resolve wallet -> Farcaster
-      try {
-        const url = `/api/farcaster/resolve-by-address?address=${encodeURIComponent(address)}`
-        console.log('🔍 Resolving wallet to Farcaster:', url)
-        const res = await fetch(url)
-        if (res.ok) {
-          const data: any = await res.json()
-          console.log('🔍 Resolve response:', data)
-          if (data?.found && data?.fid) {
-            const fid: number = Number(data.fid)
-            const username: string = data.username || `user${fid}`
-            const pfpUrl: string = data.pfpUrl || baseUser.pfpUrl
-            const userFromFarcaster: User = {
-              address: `fid-${fid}`,
-              username,
-              displayName: data.displayName || username,
-              pfpUrl,
-              isAdmin: walletIsAdmin || isAdminFid(fid),
-            }
-            setUser(userFromFarcaster)
-            setUserFid(fid)
-            setWalletAddress(address) // Keep wallet address for onchain actions
-            console.log('🔗 Resolved wallet -> Farcaster identity:', { fid, username, wallet: address })
-            return
-          } else {
-            console.log('⚠️ Wallet not linked to Farcaster:', data?.reason || 'unknown')
+      const res = await fetch(`/api/farcaster/resolve-by-address?address=${encodeURIComponent(address)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.found && data?.fid) {
+          const fid = Number(data.fid)
+          const walletUser: User = {
+            address: `fid-${fid}`,
+            username: data.username || `user${fid}`,
+            displayName: data.displayName || data.username || short,
+            pfpUrl: data.pfpUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
+            isAdmin: isAdmin || isAdminFid(fid)
           }
+          setUser(walletUser)
+          setUserFid(fid)
+          console.log('✅ Wallet resolved to Farcaster:', { fid, username: walletUser.username })
+          return
         }
-      } catch (e) {
-        console.warn('Resolver failed, using wallet identity', e)
       }
-
-      // Fallback to plain wallet identity (cannot guess, but can check-in)
-      setUser(baseUser)
-      setUserFid(null)
-      console.log('✅ Wallet authentication successful (no Farcaster linkage - limited features)')
-    } catch (error) {
-      console.error('❌ Wallet auth failed:', error)
-      throw error
+    } catch (e) {
+      console.warn('Wallet resolve failed:', e)
     }
-  }, [walletChain])
 
-  // ===========================================
-  // SIGN OUT
-  // ===========================================
+    // Fallback: wallet-only identity
+    const walletUser: User = {
+      address,
+      username: short,
+      displayName: short,
+      pfpUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
+      isAdmin
+    }
+    setUser(walletUser)
+    setUserFid(null)
+    console.log('✅ Signed in with wallet:', address)
+  }, [])
+
+  // Sign out
   const signOut = useCallback((): void => {
     setUser(null)
     setUserFid(null)
     setAuthMode(null)
     setWalletAddress(null)
-    setWalletChain(null)
-    console.log('👋 User signed out')
+    console.log('👋 Signed out')
   }, [])
-
-  const logout = useCallback((): void => {
-    signOut()
-  }, [signOut])
 
   const value: AuthContextType = {
     user,
@@ -188,13 +176,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authMode,
     isAuthenticated: !!user,
     isInFarcaster,
-    signInWithNeynar,
+    isInBaseApp,
+    platform,
+    signInWithFarcaster,
     signInWithWallet,
     signOut,
-    logout,
-    walletAddress,
-    walletChain,
-    setWalletChain
+    walletAddress
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
@@ -202,8 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider')
   }
   return context
 }

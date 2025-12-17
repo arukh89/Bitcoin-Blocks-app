@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { isAddress, encodeFunctionData, type Hex } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
-import { RewardClaimerAbi } from '@/lib/abis/rewardClaimer'
-import { createClient } from '@supabase/supabase-js'
+import { isAddress } from 'viem'
+import { createServerSupabase, getRewardSignerConfig } from '@/lib/supabase-server'
+import { signRewardClaim, generateNonce, generateExpiry } from '@/lib/reward-signer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,36 +24,40 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: 'Invalid address' }, { status: 400 })
     }
 
-    // Use same contract for all reward types (first, second, jackpot)
-    const contractAddress = process.env.REWARD_CLAIMER_ADDRESS
-    const tokenAddress = process.env.REWARD_TOKEN_ADDRESS
-    const pk = process.env.REWARD_SIGNER_PRIVATE_KEY
-    const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 8453)
-
-    if (!contractAddress || !tokenAddress || !chainId) {
+    // Get signer configuration
+    const signerConfig = getRewardSignerConfig()
+    if (!signerConfig) {
       return NextResponse.json({ ok: false, error: 'Server not configured' }, { status: 500 })
     }
-    if (!pk) {
-      return NextResponse.json({ ok: false, error: 'Signer not configured' }, { status: 501 })
-    }
+    const { contractAddress, tokenAddress, privateKey, chainId } = signerConfig
 
     const fidNum = fid !== undefined && fid !== null ? Number(fid) : 0
     if (fidNum === 0) {
       return NextResponse.json({ ok: false, error: 'Missing fid' }, { status: 400 })
     }
 
-    const devNoDb = (process.env.DEV_NO_DB || '').toLowerCase() === '1' || (process.env.DEV_NO_DB || '').toLowerCase() === 'true'
-    const allowBypass = devNoDb && process.env.NODE_ENV !== 'production'
+    // SECURITY: Always validate eligibility - no bypass allowed
+    const supabase = createServerSupabase()
+    if (!supabase) {
+      return NextResponse.json({ ok: false, error: 'Supabase not configured' }, { status: 500 })
+    }
+    const roundIdNum = Number(roundId)
 
-    if (!allowBypass) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (!supabaseUrl || !supabaseKey) {
-        return NextResponse.json({ ok: false, error: 'Supabase not configured' }, { status: 500 })
-      }
+    // Check if this claim was already processed (prevent double claims)
+    const claimKey = `${roundId}-${fidNum}-${rewardType}`
+    const { data: existingClaim } = await supabase
+      .from('reward_claims')
+      .select('id')
+      .eq('round_id', roundIdNum)
+      .eq('user_identifier', `fid-${fidNum}`)
+      .eq('claim_type', rewardType)
+      .single()
 
-      const supabase = createClient(supabaseUrl, supabaseKey)
-      const roundIdNum = Number(roundId)
+    if (existingClaim) {
+      return NextResponse.json({ ok: false, error: 'Reward already claimed' }, { status: 409 })
+    }
+
+    {
 
       const { data: roundRow, error: roundError } = await supabase
         .from('rounds')
@@ -87,7 +90,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           const da = Math.abs(a.guess - actualTx)
           const db = Math.abs(b.guess - actualTx)
           if (da !== db) return da - db
-          return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime()
+          const timeA = a.submitted_at ? new Date(a.submitted_at).getTime() : 0
+          const timeB = b.submitted_at ? new Date(b.submitted_at).getTime() : 0
+          return timeA - timeB
         })
 
         const first = sorted[0]
@@ -105,77 +110,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Record the claim attempt to prevent double claims
+    await supabase.from('reward_claims').insert({
+      round_id: roundIdNum,
+      user_identifier: `fid-${fidNum}`,
+      claim_type: rewardType,
+      amount: Number(amount),
+      token_address: tokenAddress,
+      status: 'pending'
+    })
+
+    // Sign the claim using shared utility
     const prizeType: number = rewardType === 'first' ? 1 : rewardType === 'second' ? 2 : 3
-    const amountBn = BigInt(amount)
-    const fidBn = BigInt(fidNum)
-
-    const now = Math.floor(Date.now() / 1000)
-    const expiry = BigInt(now + 60 * 60)
-    const nonce = BigInt(BigInt(Date.now()) ^ BigInt(Math.floor(Math.random() * 1e9)))
-
-    const domain = {
-      name: 'RewardClaimer',
-      version: '1',
-      chainId,
-      verifyingContract: contractAddress as `0x${string}`,
-    }
-
-    const types = {
-      Claim: [
-        { name: 'roundId', type: 'uint256' },
-        { name: 'fid', type: 'uint256' },
-        { name: 'recipient', type: 'address' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'prizeType', type: 'uint8' },
-        { name: 'nonce', type: 'uint256' },
-        { name: 'expiry', type: 'uint256' },
-      ],
-    } as const
-
     const message = {
       roundId: BigInt(roundId),
-      fid: fidBn,
+      fid: BigInt(fidNum),
       recipient: recipient as `0x${string}`,
-      amount: amountBn,
+      amount: BigInt(amount),
       prizeType,
-      nonce,
-      expiry,
+      nonce: generateNonce(),
+      expiry: generateExpiry(),
     }
 
-    const account = privateKeyToAccount(pk as Hex)
-    const signature = await account.signTypedData({
-      domain,
-      types,
-      primaryType: 'Claim',
-      message,
-    })
+    const signedClaim = await signRewardClaim(message, contractAddress, chainId, privateKey)
 
-    const data = encodeFunctionData({
-      abi: RewardClaimerAbi,
-      functionName: 'claim',
-      args: [
-        message.roundId,
-        message.fid,
-        message.recipient,
-        message.amount,
-        message.prizeType,
-        message.nonce,
-        message.expiry,
-        signature as Hex,
-      ],
-    })
-
-    const claimJson = {
-      roundId: message.roundId.toString(),
-      fid: message.fid.toString(),
-      recipient: message.recipient,
-      amount: message.amount.toString(),
-      prizeType: message.prizeType,
-      nonce: message.nonce.toString(),
-      expiry: message.expiry.toString(),
-    }
-
-    return NextResponse.json({ ok: true, signature, claim: claimJson, domain, tx: { to: contractAddress, data, chainId } })
+    return NextResponse.json({ ok: true, ...signedClaim })
   } catch (e) {
     console.error('rounds sign-claim error:', e)
     return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 })

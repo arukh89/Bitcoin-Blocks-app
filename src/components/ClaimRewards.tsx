@@ -1,28 +1,49 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useGame } from "@/context/GameContext"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { ensureWalletSession } from "@/lib/wallet-session"
-import { useAccount } from "wagmi"
+import { getWalletAddress, sendTransaction } from "@/lib/ethereum-provider"
+
+// Loading skeleton component
+function ClaimSkeleton() {
+  return (
+    <div className="animate-pulse space-y-3">
+      <div className="h-4 bg-gray-700 rounded w-1/3"></div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="h-10 bg-gray-700 rounded"></div>
+        <div className="h-10 bg-gray-700 rounded"></div>
+        <div className="h-10 bg-gray-700 rounded"></div>
+      </div>
+    </div>
+  )
+}
 
 export function ClaimRewards() {
-  const { rounds, prizeConfig, guesses } = useGame()
-  const { user } = useAuth()
-  const { address } = useAccount()
+  const { rounds, prizeConfig, guesses, connected } = useGame()
+  const { user, walletAddress } = useAuth()
   const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
+  const [claimingType, setClaimingType] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Simulate initial loading state
+  useEffect(() => {
+    if (connected && rounds.length >= 0) {
+      setIsLoading(false)
+    }
+  }, [connected, rounds])
 
   const latestFinished = useMemo(() => {
     return [...rounds].filter(r => r.status === "finished").sort((a, b) => (b.endTime || 0) - (a.endTime || 0))[0] || null
   }, [rounds])
 
   const computedWinners = useMemo(() => {
-    if (!latestFinished || latestFinished.actualTxCount == null) return [] as { address: string; guess: number; submittedAt: number }[]
-    const list = guesses
+    if (!latestFinished || latestFinished.actualTxCount == null) return []
+    return guesses
       .filter(g => g.roundId === latestFinished.id)
       .map(g => ({ address: g.address, guess: g.guess, submittedAt: g.submittedAt }))
       .sort((a, b) => {
@@ -31,7 +52,6 @@ export function ClaimRewards() {
         if (da !== db) return da - db
         return a.submittedAt - b.submittedAt
       })
-    return list
   }, [guesses, latestFinished])
 
   const firstWinner = computedWinners[0]
@@ -41,128 +61,81 @@ export function ClaimRewards() {
   const isWinnerSecond = !!(user?.address && secondWinner && user.address === secondWinner.address)
   const isJackpot = !!(firstWinner && latestFinished?.actualTxCount != null && firstWinner.guess === latestFinished.actualTxCount && user?.address === firstWinner.address)
 
-  const handleClaimFirst = async (): Promise<void> => {
-    if (!latestFinished) return
+  const handleClaim = async (rewardType: 'first' | 'second' | 'jackpot'): Promise<void> => {
+    if (!latestFinished || !user) return
+    
     try {
       setSubmitting(true)
-      const walletAddr = await ensureWalletSession()
-      const amount = prizeConfig ? prizeConfig.firstPlaceAmount : "0"
-      // Derive FID from logged in user (AuthContext stores Farcaster id as address = 'fid-<num>')
-      const fid = (user?.address && user.address.startsWith('fid-')) ? user.address.slice(4) : undefined
-      if (!fid) throw new Error('Missing Farcaster identity (FID)')
+      setClaimingType(rewardType)
+      
+      // Get wallet address
+      const recipient = walletAddress || await getWalletAddress()
+      
+      // Get FID
+      const fid = user.address.startsWith('fid-') ? user.address.slice(4) : undefined
+      if (!fid) throw new Error('Farcaster identity required')
+      
+      // Get amount based on reward type
+      const amount = rewardType === 'first' 
+        ? prizeConfig?.firstPlaceAmount 
+        : rewardType === 'second' 
+          ? prizeConfig?.secondPlaceAmount 
+          : prizeConfig?.jackpotAmount
+      
+      // Request signature from server
       const res = await fetch("/api/rounds/sign-claim", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           roundId: latestFinished.id,
-          rewardType: "first",
-          recipient: walletAddr,
-          amount,
+          rewardType,
+          recipient,
+          amount: amount || "0",
           fid,
         }),
       })
+      
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         throw new Error(j?.error || "Claim signing failed")
       }
+      
       const data = await res.json()
-      toast({ title: "Signature ready", description: "Proceeding to onchain claim..." })
+      
       if (data?.tx?.to && data?.tx?.data) {
-        const params = [{ to: data.tx.to as `0x${string}`, data: data.tx.data as `0x${string}`, value: data.tx.value || "0x0" }]
-        // Defer sending to wallet UI
-        const eth = (globalThis as any).ethereum
-        if (!eth) throw new Error("No wallet provider")
-        await eth.request({ method: "eth_sendTransaction", params })
-        toast({ title: "Claim submitted", description: "Transaction sent" })
-        return
+        toast({ title: "Confirm in wallet", description: "Please approve the transaction" })
+        
+        const txHash = await sendTransaction({
+          to: data.tx.to,
+          data: data.tx.data,
+          value: data.tx.value || "0x0"
+        })
+        
+        toast({ title: "Claim submitted!", description: `Tx: ${txHash.slice(0, 10)}...` })
       }
-      toast({ title: "Received claim signature", description: "Complete onchain step from your wallet modal" })
     } catch (e: any) {
-      toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
+      console.error('Claim error:', e)
+      if (!e?.message?.includes('rejected') && !e?.message?.includes('denied')) {
+        toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
+      }
     } finally {
       setSubmitting(false)
+      setClaimingType(null)
     }
   }
 
-  const handleClaimSecond = async (): Promise<void> => {
-    if (!latestFinished) return
-    try {
-      setSubmitting(true)
-      const walletAddr = await ensureWalletSession()
-      const amount = prizeConfig ? prizeConfig.secondPlaceAmount : "0"
-      const fid = (user?.address && user.address.startsWith('fid-')) ? user.address.slice(4) : undefined
-      if (!fid) throw new Error('Missing Farcaster identity (FID)')
-      const res = await fetch("/api/rounds/sign-claim", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          roundId: latestFinished.id,
-          rewardType: "second",
-          recipient: walletAddr,
-          amount,
-          fid,
-        }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j?.error || "Claim signing failed")
-      }
-      const data = await res.json()
-      toast({ title: "Signature ready", description: "Proceeding to onchain claim..." })
-      if (data?.tx?.to && data?.tx?.data) {
-        const params = [{ to: data.tx.to as `0x${string}`, data: data.tx.data as `0x${string}`, value: data.tx.value || "0x0" }]
-        const eth = (globalThis as any).ethereum
-        if (!eth) throw new Error("No wallet provider")
-        await eth.request({ method: "eth_sendTransaction", params })
-        toast({ title: "Claim submitted", description: "Transaction sent" })
-      }
-    } catch (e: any) {
-      toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleClaimJackpot = async (): Promise<void> => {
-    if (!latestFinished) return
-    try {
-      setSubmitting(true)
-      const walletAddr = await ensureWalletSession()
-      const amount = prizeConfig ? prizeConfig.jackpotAmount : "0"
-      const fid = (user?.address && user.address.startsWith('fid-')) ? user.address.slice(4) : undefined
-      if (!fid) throw new Error('Missing Farcaster identity (FID)')
-      const res = await fetch("/api/rounds/sign-claim", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          roundId: latestFinished.id,
-          rewardType: "jackpot",
-          recipient: walletAddr,
-          amount,
-          fid,
-        }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j?.error || "Claim signing failed")
-      }
-      const data = await res.json()
-      toast({ title: "Signature ready", description: "Proceeding to onchain claim..." })
-      if (data?.tx?.to && data?.tx?.data) {
-        const params = [{ to: data.tx.to as `0x${string}`, data: data.tx.data as `0x${string}`, value: data.tx.value || "0x0" }]
-        const eth = (globalThis as any).ethereum
-        if (!eth) throw new Error("No wallet provider")
-        await eth.request({ method: "eth_sendTransaction", params })
-        toast({ title: "Claim submitted", description: "Transaction sent" })
-      }
-    } catch (e: any) {
-      toast({ title: "Claim failed", description: e?.message || "Error", variant: "destructive" })
-    } finally {
-      setSubmitting(false)
-    }
+  // Show loading skeleton while data is loading
+  if (isLoading) {
+    return (
+      <Card className="glass-card border-2 border-emerald-500/40">
+        <CardHeader>
+          <CardTitle className="text-white">Claim Rewards</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ClaimSkeleton />
+        </CardContent>
+      </Card>
+    )
   }
 
   if (!latestFinished) return null
@@ -177,19 +150,46 @@ export function ClaimRewards() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Button
             disabled={!isWinnerFirst || submitting}
-            onClick={handleClaimFirst}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => handleClaim('first')}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
           >
-            {submitting ? "Processing..." : `Claim 1st • ${prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : ""} ${prizeConfig?.currencyType || ""}`}
+            {claimingType === 'first' ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin">⚙️</span> Processing...
+              </span>
+            ) : (
+              `Claim 1st • ${prizeConfig ? Number(prizeConfig.firstPlaceAmount).toLocaleString() : ""} ${prizeConfig?.currencyType || ""}`
+            )}
           </Button>
-          <Button disabled={!isWinnerSecond || submitting} onClick={handleClaimSecond} className="bg-violet-600 hover:bg-violet-700">Claim 2nd</Button>
-          <Button disabled={!isJackpot || submitting} onClick={handleClaimJackpot} className="bg-amber-600 hover:bg-amber-700">Claim Jackpot</Button>
+          <Button 
+            disabled={!isWinnerSecond || submitting} 
+            onClick={() => handleClaim('second')} 
+            className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50"
+          >
+            {claimingType === 'second' ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin">⚙️</span> Processing...
+              </span>
+            ) : (
+              `Claim 2nd • ${prizeConfig ? Number(prizeConfig.secondPlaceAmount).toLocaleString() : ""} ${prizeConfig?.currencyType || ""}`
+            )}
+          </Button>
+          <Button 
+            disabled={!isJackpot || submitting} 
+            onClick={() => handleClaim('jackpot')} 
+            className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+          >
+            {claimingType === 'jackpot' ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin">⚙️</span> Processing...
+              </span>
+            ) : (
+              `Claim Jackpot • ${prizeConfig ? Number(prizeConfig.jackpotAmount).toLocaleString() : ""} ${prizeConfig?.currencyType || ""}`
+            )}
+          </Button>
         </div>
-        {!isWinnerFirst && (
-          <div className="text-xs text-gray-400">You are not the recorded winner for the latest round.</div>
-        )}
-        {!address && (
-          <div className="text-xs text-gray-400">Connect a wallet to claim.</div>
+        {!isWinnerFirst && !isWinnerSecond && (
+          <div className="text-xs text-gray-400">You are not a winner for this round.</div>
         )}
       </CardContent>
     </Card>
