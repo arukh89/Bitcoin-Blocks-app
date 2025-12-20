@@ -14,7 +14,7 @@ import {
   Leaderboard,
   GlobalChat,
   BitcoinStats,
-  AdminDropdown,
+  AdminPanel,
 } from '@/components';
 
 export default function Home() {
@@ -80,11 +80,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* Header with Admin Dropdown */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <Header />
-          <AdminDropdown />
-        </div>
+        {/* Header */}
+        <Header />
 
         {/* Top Row: Jackpot + Bitcoin Stats */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -111,6 +108,9 @@ export default function Home() {
             onSend={handleSendChat}
           />
         </div>
+
+        {/* Admin Panel (expandable section) */}
+        <AdminPanel />
 
         {/* Connection Status */}
         <div className="fixed bottom-4 right-4">

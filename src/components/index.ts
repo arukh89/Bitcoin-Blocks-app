@@ -7,4 +7,4 @@ export { GuessForm } from './GuessForm';
 export { Leaderboard } from './Leaderboard';
 export { GlobalChat } from './GlobalChat';
 export { BitcoinStats } from './BitcoinStats';
-export { AdminDropdown } from './AdminDropdown';
+export { AdminPanel } from './AdminPanel';
