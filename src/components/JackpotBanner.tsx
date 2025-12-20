@@ -16,10 +16,13 @@ export function JackpotBanner({ prizeConfig }: JackpotBannerProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="glass-card p-6 border-yellow-500/30 relative overflow-hidden shimmer"
+      className="glass-card p-8 border-yellow-500/30 relative overflow-hidden shimmer"
     >
       <div className="text-center">
-        <p className="text-yellow-400 text-sm font-medium">💰 Jackpot</p>
+        <div className="flex items-center justify-center gap-4 mb-3">
+          <span className="text-6xl lg:text-7xl">💰</span>
+          <p className="text-yellow-400 text-3xl lg:text-4xl font-bold">Jackpot</p>
+        </div>
         <motion.p
           animate={{
             textShadow: [
@@ -29,7 +32,7 @@ export function JackpotBanner({ prizeConfig }: JackpotBannerProps) {
             ],
           }}
           transition={{ duration: 2, repeat: Infinity }}
-          className="text-4xl lg:text-5xl font-bold text-yellow-400"
+          className="text-5xl lg:text-6xl font-bold text-yellow-400"
         >
           {jackpot.toLocaleString()} {currency}
         </motion.p>

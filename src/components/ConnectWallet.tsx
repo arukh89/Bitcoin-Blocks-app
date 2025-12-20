@@ -2,16 +2,16 @@
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { motion } from 'framer-motion';
+import { useState } from 'react';
 
 export function ConnectWallet() {
   const { address, isConnected } = useAccount();
-  const { connectors, connect, isPending } = useConnect();
+  const { connectors, connect, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
+  const [showOptions, setShowOptions] = useState(false);
 
-  // Find injected connector (MetaMask, Coinbase, Rabby, etc.)
-  const injectedConnector = connectors.find(
-    (c) => c.id === 'injected' || c.type === 'injected'
-  );
+  // Get all available connectors
+  const availableConnectors = connectors.filter(c => c.id !== 'injected' || c.name !== 'Injected');
 
   if (isConnected && address) {
     return (
@@ -29,15 +29,59 @@ export function ConnectWallet() {
     );
   }
 
+  // If only one connector, connect directly
+  if (availableConnectors.length === 1) {
+    return (
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => connect({ connector: availableConnectors[0] })}
+        disabled={isPending}
+        className="px-4 py-2 rounded-full bg-gradient-to-r from-orange-500 to-purple-500 font-medium disabled:opacity-50"
+      >
+        {isPending ? '⏳ Connecting...' : '🔗 Connect Wallet'}
+      </motion.button>
+    );
+  }
+
   return (
-    <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => injectedConnector && connect({ connector: injectedConnector })}
-      disabled={isPending || !injectedConnector}
-      className="px-4 py-2 rounded-full bg-gradient-to-r from-orange-500 to-purple-500 font-medium disabled:opacity-50"
-    >
-      {isPending ? '⏳ Connecting...' : '🔗 Connect Wallet'}
-    </motion.button>
+    <div className="relative">
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => setShowOptions(!showOptions)}
+        disabled={isPending}
+        className="px-4 py-2 rounded-full bg-gradient-to-r from-orange-500 to-purple-500 font-medium disabled:opacity-50"
+      >
+        {isPending ? '⏳ Connecting...' : '🔗 Connect Wallet'}
+      </motion.button>
+
+      {showOptions && (
+        <div className="absolute top-full right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50">
+          {availableConnectors.map((connector) => (
+            <button
+              key={connector.uid}
+              onClick={() => {
+                connect({ connector });
+                setShowOptions(false);
+              }}
+              className="w-full px-4 py-3 text-left text-sm hover:bg-gray-800 first:rounded-t-lg last:rounded-b-lg transition flex items-center gap-2"
+            >
+              {connector.name === 'Farcaster MiniApp' && '🟣 '}
+              {connector.name.includes('Coinbase') && '🔵 '}
+              {connector.name.includes('MetaMask') && '🦊 '}
+              {connector.name === 'Injected' && '💉 '}
+              {connector.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <p className="absolute top-full mt-1 text-xs text-red-400">
+          {error.message}
+        </p>
+      )}
+    </div>
   );
 }

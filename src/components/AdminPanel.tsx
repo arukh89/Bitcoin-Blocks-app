@@ -9,7 +9,8 @@ import { useFarcasterUser } from '@/hooks/useFarcasterUser';
 export function AdminPanel() {
   const { user } = useFarcasterUser();
   const {
-    activeRound,
+    activeRounds,
+    selectedRound,
     allRounds,
     prizeConfig,
     guesses,
@@ -23,11 +24,10 @@ export function AdminPanel() {
   const [activeTab, setActiveTab] = useState<'round' | 'result' | 'prize' | 'history'>('round');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedAdminRound, setSelectedAdminRound] = useState<string>('');
 
   // Form states
-  const [roundNumber, setRoundNumber] = useState('1');
   const [duration, setDuration] = useState('10');
-  const [prize, setPrize] = useState('5,000 $SECOND');
   const [blockNumber, setBlockNumber] = useState('');
   const [actualTxCount, setActualTxCount] = useState('');
   const [blockHash, setBlockHash] = useState('');
@@ -38,12 +38,21 @@ export function AdminPanel() {
 
   const isAdmin = isAdminFid(user?.fid);
 
+  // Get next round number for display
+  const nextRoundNumber = allRounds.length > 0 
+    ? Math.max(...allRounds.map((r) => r.round_number)) + 1 
+    : 1;
+
+  // Get the round to manage (selected in admin or first active)
+  const managedRound = selectedAdminRound 
+    ? activeRounds.find(r => r.id === selectedAdminRound) 
+    : activeRounds[0];
+
   useEffect(() => {
-    if (allRounds.length > 0) {
-      const maxRound = Math.max(...allRounds.map((r) => r.round_number));
-      setRoundNumber(String(maxRound + 1));
+    if (activeRounds.length > 0 && !selectedAdminRound) {
+      setSelectedAdminRound(activeRounds[0].id);
     }
-  }, [allRounds]);
+  }, [activeRounds, selectedAdminRound]);
 
   useEffect(() => {
     if (prizeConfig) {
@@ -61,19 +70,10 @@ export function AdminPanel() {
     setTimeout(() => setMessage(null), 4000);
   };
 
-  const handleCreateRound = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCloseRound = async (roundId: string) => {
+    if (!roundId) return;
     setIsSubmitting(true);
-    const { error } = await createRound(parseInt(roundNumber), parseInt(duration), prize, blockNumber ? parseInt(blockNumber) : undefined);
-    showMsg(error ? 'error' : 'success', error ? String(error) : `Round #${roundNumber} created!`);
-    if (!error) setRoundNumber(String(parseInt(roundNumber) + 1));
-    setIsSubmitting(false);
-  };
-
-  const handleCloseRound = async () => {
-    if (!activeRound) return;
-    setIsSubmitting(true);
-    const { error } = await closeRound(activeRound.id);
+    const { error } = await closeRound(roundId);
     showMsg(error ? 'error' : 'success', error ? String(error) : 'Round closed!');
     setIsSubmitting(false);
   };
@@ -94,11 +94,49 @@ export function AdminPanel() {
     setIsSubmitting(false);
   };
 
+  // Validate if block already exists in mempool.space
+  const validateBlockExists = async (blockNum: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/mempool?block=${blockNum}`);
+      const data = await res.json();
+      return !data.error && data.tx_count !== undefined;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleCreateRoundWithValidation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // If block number is provided, validate it doesn't already exist
+    if (blockNumber) {
+      setIsSubmitting(true);
+      const blockExists = await validateBlockExists(blockNumber);
+      if (blockExists) {
+        showMsg('error', `⚠️ Block #${blockNumber} already exists. Please choose a future block.`);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    
+    // Get prize from prizeConfig
+    const prizeText = `${prizeConfig?.first_place?.toLocaleString() || '1,000'} ${prizeConfig?.currency || '$SECOND'}`;
+    
+    setIsSubmitting(true);
+    const result = await createRound(parseInt(duration), prizeText, blockNumber ? parseInt(blockNumber) : undefined);
+    if (result.error) {
+      showMsg('error', String(result.error));
+    } else {
+      showMsg('success', `Round #${result.roundNumber || nextRoundNumber} created!`);
+    }
+    setIsSubmitting(false);
+  };
+
   const handleUpdateResult = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeRound) return;
+    if (!managedRound) return;
     setIsSubmitting(true);
-    const { error } = await updateRoundResult(activeRound.id, parseInt(actualTxCount), blockHash);
+    const { error } = await updateRoundResult(managedRound.id, parseInt(actualTxCount), blockHash);
     showMsg(error ? 'error' : 'success', error ? String(error) : 'Winner determined!');
     if (!error) { setActualTxCount(''); setBlockHash(''); }
     setIsSubmitting(false);
@@ -160,21 +198,44 @@ export function AdminPanel() {
                 </motion.div>
               )}
 
-              {/* Current Round Status */}
+              {/* Active Rounds Status */}
               <div className="p-3 rounded-lg bg-white/5 mb-4">
-                <p className="text-xs text-gray-400 mb-1">Current Round</p>
-                {activeRound ? (
-                  <div className="flex items-center gap-4">
-                    <span className="font-bold">#{activeRound.round_number}</span>
-                    <span className={`px-2 py-0.5 rounded text-xs ${
-                      activeRound.status === 'open' ? 'bg-green-500/20 text-green-400' :
-                      activeRound.status === 'closed' ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-purple-500/20 text-purple-400'
-                    }`}>{activeRound.status}</span>
-                    <span className="text-sm text-gray-400">{guesses.length} guesses</span>
+                <p className="text-xs text-gray-400 mb-2">Active Rounds ({activeRounds.length})</p>
+                {activeRounds.length > 0 ? (
+                  <div className="space-y-2">
+                    {activeRounds.map((r) => (
+                      <div 
+                        key={r.id}
+                        onClick={() => setSelectedAdminRound(r.id)}
+                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${
+                          selectedAdminRound === r.id ? 'bg-purple-500/20 border border-purple-500/50' : 'bg-white/5 hover:bg-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold">#{r.round_number}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            r.status === 'open' ? 'bg-green-500/20 text-green-400' :
+                            r.status === 'closed' ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-purple-500/20 text-purple-400'
+                          }`}>{r.status}</span>
+                          {r.block_number && (
+                            <span className="text-xs text-gray-400">Block #{r.block_number}</span>
+                          )}
+                        </div>
+                        {r.status === 'open' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCloseRound(r.id); }}
+                            disabled={isSubmitting}
+                            className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-400 rounded hover:bg-yellow-500/30 transition"
+                          >
+                            Close
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <p className="text-gray-400">No active round</p>
+                  <p className="text-gray-400">No active rounds</p>
                 )}
               </div>
 
@@ -198,11 +259,13 @@ export function AdminPanel() {
 
               {/* Tab Content */}
               {activeTab === 'round' && (
-                <form onSubmit={handleCreateRound} className="space-y-3">
+                <form onSubmit={handleCreateRoundWithValidation} className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">Round Number</label>
-                      <input type="number" value={roundNumber} onChange={(e) => setRoundNumber(e.target.value)} className="w-full px-3 py-2 bg-black/30 rounded-lg border border-white/10 focus:border-purple-500 focus:outline-none" required />
+                      <label className="text-xs text-gray-400 block mb-1">Next Round (auto)</label>
+                      <div className="w-full px-3 py-2 bg-black/50 rounded-lg border border-white/10 text-gray-300 font-bold">
+                        #{nextRoundNumber}
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">Duration (minutes)</label>
@@ -210,30 +273,32 @@ export function AdminPanel() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Prize</label>
-                    <input type="text" value={prize} onChange={(e) => setPrize(e.target.value)} className="w-full px-3 py-2 bg-black/30 rounded-lg border border-white/10 focus:border-purple-500 focus:outline-none" required />
-                  </div>
-                  <div>
                     <label className="text-xs text-gray-400 block mb-1">Target Block # (optional)</label>
                     <input type="number" value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} placeholder="e.g. 875420" className="w-full px-3 py-2 bg-black/30 rounded-lg border border-white/10 focus:border-purple-500 focus:outline-none" />
                   </div>
+                  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                    <p className="text-xs text-gray-400">Prize (from Prize tab)</p>
+                    <p className="font-bold text-yellow-400">
+                      🏆 1st: {prizeConfig?.first_place?.toLocaleString() || '1,000'} {prizeConfig?.currency || '$SECOND'} | 
+                      🥈 2nd: {prizeConfig?.second_place?.toLocaleString() || '500'} {prizeConfig?.currency || '$SECOND'}
+                    </p>
+                  </div>
                   <div className="flex gap-2">
-                    <button type="submit" disabled={isSubmitting || activeRound?.status === 'open'} className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg font-bold disabled:opacity-50">
+                    <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg font-bold disabled:opacity-50">
                       {isSubmitting ? '⏳' : '🚀'} Create Round
                     </button>
-                    {activeRound?.status === 'open' && (
-                      <button type="button" onClick={handleCloseRound} disabled={isSubmitting} className="flex-1 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg font-bold disabled:opacity-50">
-                        ⏰ Close Round
-                      </button>
-                    )}
                   </div>
                 </form>
               )}
 
               {activeTab === 'result' && (
                 <form onSubmit={handleUpdateResult} className="space-y-3">
-                  {activeRound?.status === 'closed' ? (
+                  {managedRound?.status === 'closed' ? (
                     <>
+                      <div className="p-2 rounded-lg bg-purple-500/10 text-sm mb-3">
+                        Managing: <span className="font-bold">Round #{managedRound.round_number}</span>
+                        {managedRound.block_number && <span className="text-gray-400 ml-2">(Block #{managedRound.block_number})</span>}
+                      </div>
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Actual TX Count</label>
                         <input type="number" value={actualTxCount} onChange={(e) => setActualTxCount(e.target.value)} placeholder="e.g. 2834" className="w-full px-3 py-2 bg-black/30 rounded-lg border border-white/10 focus:border-purple-500 focus:outline-none" required />
@@ -242,8 +307,8 @@ export function AdminPanel() {
                         <label className="text-xs text-gray-400 block mb-1">Block Hash</label>
                         <input type="text" value={blockHash} onChange={(e) => setBlockHash(e.target.value)} placeholder="000000..." className="w-full px-3 py-2 bg-black/30 rounded-lg border border-white/10 focus:border-purple-500 focus:outline-none" required />
                       </div>
-                      <button type="button" onClick={handleFetchBlock} disabled={isSubmitting || !blockNumber} className="w-full py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg hover:bg-blue-500/30 transition disabled:opacity-50">
-                        🔍 Auto-fetch from Block #{blockNumber || '?'}
+                      <button type="button" onClick={handleFetchBlock} disabled={isSubmitting || !managedRound.block_number} className="w-full py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg hover:bg-blue-500/30 transition disabled:opacity-50">
+                        🔍 Auto-fetch from Block #{managedRound.block_number || '?'}
                       </button>
                       <button type="submit" disabled={isSubmitting || !actualTxCount || !blockHash} className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-bold disabled:opacity-50">
                         🏆 Determine Winner
@@ -251,7 +316,7 @@ export function AdminPanel() {
                     </>
                   ) : (
                     <div className="text-center py-8 text-gray-400">
-                      {activeRound?.status === 'open' ? '⏳ Close the round first to update results' : '📭 No round to update'}
+                      {activeRounds.some(r => r.status === 'open') ? '⏳ Close a round first to update results' : '📭 No closed rounds to update'}
                     </div>
                   )}
                 </form>
@@ -284,26 +349,82 @@ export function AdminPanel() {
               )}
 
               {activeTab === 'history' && (
-                <div className="max-h-64 overflow-y-auto">
-                  {allRounds.length === 0 ? (
-                    <p className="text-center text-gray-400 py-4">No rounds yet</p>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead className="text-gray-400 text-xs">
-                        <tr><th className="text-left pb-2">#</th><th className="text-left pb-2">Status</th><th className="text-left pb-2">TX</th><th className="text-left pb-2">Winner</th></tr>
-                      </thead>
-                      <tbody>
-                        {allRounds.slice(0, 10).map((r) => (
-                          <tr key={r.id} className="border-t border-white/5">
-                            <td className="py-2 font-bold">{r.round_number}</td>
-                            <td className="py-2"><span className={`px-1.5 py-0.5 rounded text-xs ${r.status === 'open' ? 'bg-green-500/20 text-green-400' : r.status === 'closed' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}>{r.status}</span></td>
-                            <td className="py-2">{r.actual_tx_count || '-'}</td>
-                            <td className="py-2">{r.winner_fid ? `FID:${r.winner_fid}` : '-'}</td>
+                <div className="space-y-4">
+                  {/* Stats Summary */}
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="p-3 rounded-lg bg-green-500/10">
+                      <p className="text-2xl font-bold text-green-400">
+                        {allRounds.filter(r => r.status === 'finished').length}
+                      </p>
+                      <p className="text-xs text-gray-400">Completed</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-yellow-500/10">
+                      <p className="text-2xl font-bold text-yellow-400">
+                        {allRounds.filter(r => r.status === 'open' || r.status === 'closed').length}
+                      </p>
+                      <p className="text-xs text-gray-400">Active</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-purple-500/10">
+                      <p className="text-2xl font-bold text-purple-400">
+                        {allRounds.length}
+                      </p>
+                      <p className="text-xs text-gray-400">Total</p>
+                    </div>
+                  </div>
+
+                  {/* Rounds Table */}
+                  <div className="max-h-64 overflow-y-auto">
+                    {allRounds.length === 0 ? (
+                      <p className="text-center text-gray-400 py-4">No rounds yet</p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead className="text-gray-400 text-xs sticky top-0 bg-gray-900/90">
+                          <tr>
+                            <th className="text-left pb-2 px-2">#</th>
+                            <th className="text-left pb-2 px-2">Status</th>
+                            <th className="text-left pb-2 px-2">Block</th>
+                            <th className="text-left pb-2 px-2">TX Count</th>
+                            <th className="text-left pb-2 px-2">Winner</th>
+                            <th className="text-left pb-2 px-2">2nd</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                        </thead>
+                        <tbody>
+                          {allRounds.map((r) => (
+                            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5">
+                              <td className="py-2 px-2 font-bold">{r.round_number}</td>
+                              <td className="py-2 px-2">
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                  r.status === 'open' ? 'bg-green-500/20 text-green-400' : 
+                                  r.status === 'closed' ? 'bg-yellow-500/20 text-yellow-400' : 
+                                  'bg-purple-500/20 text-purple-400'
+                                }`}>
+                                  {r.status}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2 font-mono text-xs">
+                                {r.block_number ? `#${r.block_number}` : '-'}
+                              </td>
+                              <td className="py-2 px-2">
+                                {r.actual_tx_count ? (
+                                  <span className="text-green-400">{r.actual_tx_count.toLocaleString()}</span>
+                                ) : '-'}
+                              </td>
+                              <td className="py-2 px-2">
+                                {r.winner_fid ? (
+                                  <span className="text-yellow-400">🏆 {r.winner_username || `FID:${r.winner_fid}`}</span>
+                                ) : '-'}
+                              </td>
+                              <td className="py-2 px-2">
+                                {r.second_place_fid ? (
+                                  <span className="text-gray-400">🥈 {r.second_place_username || `FID:${r.second_place_fid}`}</span>
+                                ) : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
