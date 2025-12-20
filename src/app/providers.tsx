@@ -5,6 +5,7 @@ import { useEffect, useMemo } from "react"
 import { WagmiProvider, createConfig } from "wagmi"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { farcasterMiniApp as miniAppConnector } from "@farcaster/miniapp-wagmi-connector"
+import { injected } from "wagmi/connectors"
 import { base } from "viem/chains"
 import { http } from "viem"
 import { useAccount, useConnect } from "wagmi"
@@ -15,7 +16,10 @@ const queryClient = new QueryClient()
 const config = createConfig({
   chains: [base],
   transports: { [base.id]: http() },
-  connectors: [miniAppConnector()],
+  connectors: [
+    miniAppConnector(),
+    injected(), // Detect MetaMask, Coinbase Wallet, Rabby, etc.
+  ],
   ssr: true,
   multiInjectedProviderDiscovery: true,
 })

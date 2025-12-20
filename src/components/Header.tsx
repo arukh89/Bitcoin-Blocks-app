@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useFarcasterUser } from '@/hooks/useFarcasterUser';
 import { useIsInFarcaster } from '@/hooks/useIsInFarcaster';
 import { isAdminFid } from '@/config/app-config';
+import { ConnectWallet } from './ConnectWallet';
 
 export function Header() {
   const { user, loading } = useFarcasterUser();
@@ -35,7 +36,7 @@ export function Header() {
           {isInFarcaster ? '🟣 Farcaster' : '🌐 Browser'}
         </span>
 
-        {/* User info */}
+        {/* User info or Connect Wallet */}
         {loading ? (
           <div className="px-3 py-2 rounded-full bg-yellow-500/20 border border-yellow-500/30">
             <span className="text-sm text-yellow-400">Loading...</span>
@@ -50,6 +51,9 @@ export function Header() {
             </span>
             {userIsAdmin && <span className="text-xs">👑</span>}
           </div>
+        ) : !isInFarcaster ? (
+          // Show Connect Wallet button in browser mode
+          <ConnectWallet />
         ) : (
           <div className="px-3 py-2 rounded-full bg-gray-500/20 border border-gray-500/30">
             <span className="text-sm text-gray-400">Not connected</span>

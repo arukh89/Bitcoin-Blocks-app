@@ -1,5 +1,6 @@
 export { Header } from './Header';
 export { LoadingScreen } from './LoadingScreen';
+export { ConnectWallet } from './ConnectWallet';
 export { CurrentRound } from './CurrentRound';
 export { JackpotBanner } from './JackpotBanner';
 export { GuessForm } from './GuessForm';
