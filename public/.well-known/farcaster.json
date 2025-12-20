@@ -1,0 +1,16 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjI1MDcwNCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweEQzNjM0NjM4NjM2NDM2MzQzNjM4MzYzNDM2MzQzNjM4MzYzNDM2MzQzNjM4MzYzNDM2MzQzNjM4MzYzNDM2MzQifQ",
+    "payload": "eyJkb21haW4iOiJiaXRjb2luLWJsb2Nrcy52ZXJjZWwuYXBwIn0",
+    "signature": "REPLACE_WITH_YOUR_SIGNATURE"
+  },
+  "frame": {
+    "version": "1",
+    "name": "Bitcoin Blocks",
+    "iconUrl": "https://bitcoin-blocks.vercel.app/icon.png",
+    "homeUrl": "https://bitcoin-blocks.vercel.app",
+    "splashImageUrl": "https://bitcoin-blocks.vercel.app/splash.png",
+    "splashBackgroundColor": "#1a1a2e",
+    "webhookUrl": "https://bitcoin-blocks.vercel.app/api/webhook"
+  }
+}

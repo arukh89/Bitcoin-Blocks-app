@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="50%" style="stop-color:#16213e"/>
+      <stop offset="100%" style="stop-color:#533483"/>
+    </linearGradient>
+  </defs>
+  <text x="600" y="250" font-size="120" text-anchor="middle" fill="white">🛠️</text>
+  <text x="600" y="380" font-size="60" font-weight="bold" text-anchor="middle" fill="url(#textGrad)">Bitcoin Blocks</text>
+  <text x="600" y="450" font-size="30" text-anchor="middle" fill="#9ca3af">Predict Bitcoin block transactions and win prizes!</text>
+  <defs>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff7800"/>
+      <stop offset="100%" style="stop-color:#9333ea"/>
+    </linearGradient>
+  </defs>
+</svg>
